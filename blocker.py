@@ -21,7 +21,8 @@ class HostsHandler (FileSystemEventHandler):
     fixed = False
 
     def on_any_event (self, event ):
-        if prnt: print(event.src_path+' was '+event.event_type+'!');
+        if event.src_path == dir + '/' + fname:
+            if prnt: print(event.src_path+' was '+event.event_type+'!')
 
     def on_modified (self, event):
         filename = event.src_path
@@ -42,7 +43,7 @@ def refresh (filename):
 
     # construct lines of new file
     blockentries = [ '0.0.0.0\t'+i+'\n' for i in blocklist ]
-    newdata = data
+    newdata = data[:]
     for entry in blockentries:
         if entry not in data:
             if '#'+entry in data:
@@ -51,16 +52,16 @@ def refresh (filename):
             else:
                 # add the line
                 newdata.append(entry)
-                
-    # TODO - test this bit
-    # if data != newdata:
-    # TODO - if that works, indent the next block
 
-    # update the file
-    with open(filename, 'w') as f:
-        f.writelines(newdata)
+    if data == newdata:
+        # file has not changed - don't bother writing
+        if prnt: print('nothing\'s changed!')
+    else:
+        # update the file
+        with open(filename, 'w') as f:
+            f.writelines(newdata)
 
-    if prnt: print('refreshed')
+        if prnt: print('refreshed')
 
 def main ():
     # specify sites
@@ -84,8 +85,8 @@ def main ():
     # wait for keyboard interrupt
     try:
         while True:
-            # check on a 10 minute timer as well, in case of undetected edits.
-            time.sleep(60*10)
+            # check on a 1 minute timer as well, in case of undetected edits.
+            time.sleep(60*1)
             refresh(fname)
     except KeyboardInterrupt:
         observer.stop()
