@@ -1,0 +1,36 @@
+127.0.0.1	localhost
+127.0.1.1	Doug-Lin
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+0.0.0.0	reddit.com
+0.0.0.0	www.reddit.com
+
+0.0.0.0	twitch.tv
+0.0.0.0	www.twitch.tv
+
+0.0.0.0	twitter.com
+0.0.0.0	www.twitter.com
+
+0.0.0.0	youtube.com
+0.0.0.0	www.youtube.com
+
+0.0.0.0	tumblr.com
+0.0.0.0	www.tumblr.com
+
+0.0.0.0	4chan.org
+0.0.0.0	www.4chan.org
+
+0.0.0.0	medium.com
+0.0.0.0	www.medium.com
+
+0.0.0.0	vimeo.com
+0.0.0.0	www.vimeo.com
+
+0.0.0.0	dailymotion.com
+0.0.0.0	www.dailymotion.com
