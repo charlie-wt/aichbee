@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+
 import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+testing = True
 prnt = True
 default_blocklist = [
     'reddit.com',
@@ -14,8 +17,11 @@ default_blocklist = [
     'vimeo.com',
     'dailymotion.com'
 ]
-dir = '.'
-fname = 'testhosts'
+# dir = '/etc'
+dir = '.' if testing else '/etc'
+fname = 'hosts'
+done_times = 0
+after = 1
 
 class HostsHandler (FileSystemEventHandler):
     ''' class to handle file system events, specifically for the hosts file. '''
@@ -72,6 +78,9 @@ def read_block_file (filename):
 
 def refresh (filename, blocklist):
     ''' main function to correct the hosts file. '''
+    global done_times
+    global after
+    if prnt: print('refreshing')
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
@@ -83,10 +92,14 @@ def refresh (filename, blocklist):
         if entry not in data:
             if '#'+entry in data:
                 # uncomment the line
+                if prnt: print(entry[:-1], 'is commented at line', data.index('#'+entry))
                 newdata[data.index('#'+entry)] = entry
             else:
                 # add the line
+                if prnt: print(entry[:-1], 'is missing')
                 newdata.append(entry)
+        else:
+            if prnt: print(entry[:-1], 'is present, at line', data.index(entry))
 
     if data == newdata:
         # file has not changed - don't bother writing
@@ -95,8 +108,15 @@ def refresh (filename, blocklist):
         # update the file
         with open(filename, 'w') as f:
             f.writelines(newdata)
-
         if prnt: print('refreshed')
+
+    # testing lol
+    if testing:
+        if done_times > after:
+            with open(filename, 'w') as f:
+                newdata.append('# also hello')
+                f.writelines(newdata)
+        done_times += 1
 
 def main ():
     # specify sites
@@ -107,13 +127,14 @@ def main ():
         blocklist = default_blocklist
     global fname
     global dir
+    filename = dir+'/'+fname if not dir[-1] == '/' else dir+filename
     # add alternate forms
     orig = blocklist[:]
     blocklist += [ 'www.' + item for item in orig if not item.startswith('www.') ]
     blocklist += [ item[4:] for item in orig if item.startswith('www.') ]
 
     # do an initial refresh, to get things going
-    refresh(fname, blocklist)
+    refresh(filename, blocklist)
 
     # start watching file
     observer = Observer()
@@ -125,8 +146,8 @@ def main ():
     try:
         while True:
             # check on a 1 minute timer as well, in case of undetected edits.
-            time.sleep(60*1)
-            refresh(fname, blocklist)
+            time.sleep(6*1)
+            refresh(filename, blocklist)
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
