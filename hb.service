@@ -1,0 +1,10 @@
+[Unit]
+Description=A website blocker
+[Service]
+WorkingDirectory=/home/charlie/
+Type=simple
+TimeoutSec=2
+ExecStart=/home/charlie/Programming/python/hb/bl.sh
+User=root
+[Install]
+WantedBy=multi-user.target

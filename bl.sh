@@ -1,7 +1,7 @@
 #!/bin/bash
 
 scr="/home/charlie/Programming/python/hb"
-dir=${1:-"$scr"}
+dir=${1:-"/etc"}
 fname=${2:-"hosts"}
 blocklist=${3:-"blocklist.txt"}
 

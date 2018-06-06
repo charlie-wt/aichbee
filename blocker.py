@@ -5,7 +5,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 testing = True
-prnt = True
+prnt = False
 default_blocklist = [
     'reddit.com',
     'youtube.com',
