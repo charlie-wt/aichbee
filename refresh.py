@@ -1,35 +1,63 @@
 #!/usr/bin/env python3
 
 import sys
-prnt = False
+import datetime
+
+prnt = True
 
 def read_block_file (filename):
     ''' read a list of domains to block (like 'blocklist'), from a file '''
     blocklist = []
+    blockgroups = []
 
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
 
+    # TODO #temporary: this assumes just one block group
+    block_start = None
+    block_end = None
+    current_block = None
     # get just the blocked domains
     reading_blocks = False
     for line in data:
         if line[-1] == '\n':
             line = line[:-1]
-        if line == '= DOMAINS':
-            reading_blocks = True
-        elif reading_blocks:
-            if line == '===':
+        if line[0] == "=":
+            # lines beginning with '=' mark the start & end of individual block groups
+            if reading_blocks:
                 reading_blocks = False
             else:
+                blockgroups.append({ 'list': [], 'start': None, 'end': None })
+                current_block = blockgroups[-1]
+                reading_blocks = True
+        elif reading_blocks:
+            if line[0] == '@':
+                # line beginning with @: time range in which to apply the blocks
+                l = line.replace(' ', '')
+                start_str = l[1:l.index('-')]
+                end_str = l[l.index('-')+1:len(l)]
+                block_start = datetime.datetime.strptime(start_str, '%H:%M').time()
+                block_end = datetime.datetime.strptime(end_str, '%H:%M').time()
+                if prnt: print(block_start, '->', block_end)
+                current_block['start'] = block_start
+                current_block['end'] = block_end
+            else:
                 blocklist.append(line)
+                current_block['list'].append(line)
 
     # add www./non www. versions if necessary
     orig = blocklist[:]
     blocklist += [ 'www.' + item for item in orig if not item.startswith('www.') ]
     blocklist += [ item[4:] for item in orig if item.startswith('www.') ]
+    for group in blockgroups:
+        orig = group['list'][:]
+        group['list'] += [ 'www.' + item for item in orig if not item.startswith('www.') ]
+        group['list'] += [ item[4:] for item in orig if item.startswith('www.') ]
 
-    if prnt: print(blocklist)
+    if prnt:
+        print(blocklist)
+        print(blockgroups)
 
     # return results
     return blocklist
