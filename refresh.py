@@ -2,6 +2,7 @@
 
 import sys
 import datetime
+from datetime import datetime as dt
 
 prnt = True
 
@@ -14,7 +15,7 @@ def read_block_file (filename):
     with open(filename, 'r') as f:
         data = f.readlines()
 
-    # TODO #temporary: this assumes just one block group
+    # TODO #cleanup: remove old, no-time/single-group version...
     block_start = None
     block_end = None
     current_block = None
@@ -37,8 +38,8 @@ def read_block_file (filename):
                 l = line.replace(' ', '')
                 start_str = l[1:l.index('-')]
                 end_str = l[l.index('-')+1:len(l)]
-                block_start = datetime.datetime.strptime(start_str, '%H:%M').time()
-                block_end = datetime.datetime.strptime(end_str, '%H:%M').time()
+                block_start = dt.strptime(start_str, '%H:%M').time()
+                block_end = dt.strptime(end_str, '%H:%M').time()
                 if prnt: print(block_start, '->', block_end)
                 current_block['start'] = block_start
                 current_block['end'] = block_end
@@ -60,39 +61,53 @@ def read_block_file (filename):
         print(blockgroups)
 
     # return results
-    return blocklist
+    return (blocklist, blockgroups)
 
-def refresh (filename, blocklist):
+def refresh (filename, blocks):
     ''' main function to correct the hosts file. '''
     if prnt: print('refreshing')
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
 
-    # construct lines of new file
-    blockentries = [ '0.0.0.0\t'+i+'\n' for i in blocklist ]
-    newdata = data[:]
-    for entry in blockentries:
-        if entry not in data:
-            if '#'+entry in data:
-                # uncomment the line
-                if prnt: print(entry[:-1], 'is commented at line', data.index('#'+entry))
-                newdata[data.index('#'+entry)] = entry
-            else:
-                # add the line
-                if prnt: print(entry[:-1], 'is missing')
-                newdata.append(entry)
-        else:
-            if prnt: print(entry[:-1], 'is present, at line', data.index(entry))
-
-    if data == newdata:
-        # file has not changed - don't bother writing
-        if prnt: print('nothing\'s changed!')
+    # TODO #temporary: assumes only one block group
+    (blocklist, blockgroups) = blocks
+    group = blockgroups[0]
+    within_time = False
+    now = dt.time(dt.now())
+    midnight = datetime.time(0, 0)
+    if group['start'] < group['end']:
+        within_time = now > group['start'] and now < group['end']
     else:
-        # update the file
-        with open(filename, 'w') as f:
-            f.writelines(newdata)
-        if prnt: print('refreshed')
+        within_time = (now > group['start'] and now < midnight) or \
+                      (now < group['end']   and now > midnight)
+
+    if within_time:
+        # construct lines of new file
+        blockentries = [ '0.0.0.0\t'+i+'\n' for i in blocklist ]
+        newdata = data[:]
+        for entry in blockentries:
+            if entry not in data:
+                if '#'+entry in data:
+                    # uncomment the line
+                    if prnt: print(entry[:-1], 'is commented at line', data.index('#'+entry))
+                    newdata[data.index('#'+entry)] = entry
+                else:
+                    # add the line
+                    if prnt: print(entry[:-1], 'is missing')
+                    newdata.append(entry)
+            else:
+                if prnt: print(entry[:-1], 'is present, at line', data.index(entry))
+
+        if data == newdata:
+            # file has not changed - don't bother writing
+            if prnt: print('nothing\'s changed!')
+        else:
+            # update the file
+            with open(filename, 'w') as f:
+                f.writelines(newdata)
+            if prnt: print('refreshed')
+    elif prnt: print('not in time range', group['start'], '->',  group['end'])
 
 def main ():
     if prnt: print('refreshing', sys.argv[1], 'using blocklist', sys.argv[2])
