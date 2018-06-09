@@ -16,6 +16,8 @@ def read_block_file (filename):
         data = f.readlines()
 
     # TODO #cleanup: remove old, no-time/single-group version...
+    # TODO #functionality: allow multiple time constraint rules?
+    #                      - would need to check consistency, I think
     block_start = None
     block_end = None
     current_block = None

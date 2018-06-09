@@ -1,7 +1,7 @@
 [Unit]
 Description=A website blocker
+After=multi-user.target
 [Service]
-WorkingDirectory=/home/charlie/
 Type=simple
 TimeoutSec=2
 ExecStart=/home/charlie/Programming/python/hb/bl.sh

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 scr="/home/charlie/Programming/python/hb"
 dir=${1:-"/etc"}
