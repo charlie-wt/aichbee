@@ -1,8 +1,9 @@
 [Unit]
 Description=A website blocker
-After=multi-user.target
+After=multi-user.target graphical.target network-online.target
 [Service]
 Type=simple
+Restart=always
 TimeoutSec=2
 ExecStart=/home/charlie/Programming/python/hb/bl.sh
 User=root
