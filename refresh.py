@@ -4,7 +4,7 @@ import sys
 import datetime
 from datetime import datetime as dt
 
-verbose = False
+verbose = True
 
 def read_block_file (filename):
     ''' read a list of domains to block (like 'blocklist'), from a file '''
@@ -22,15 +22,17 @@ def read_block_file (filename):
     # get just the blocked domains
     in_group = False
     for line in data:
-        if line[-1] == '\n':
-            line = line[:-1]
+        if line == '\n' or line[0] == '#': continue
+        if line[-1] == '\n': line = line[:-1]
+
         if line[0] == "=":
             # lines beginning with '=' mark the start & end of individual block groups
             if in_group:
                 in_group = False
             else:
                 in_group = True
-                blockgroups.append({ 'list': [], 'start': None, 'end': None })
+                name = line[1:] if line[1] != ' ' else line[2:]
+                blockgroups.append({ 'name': name, 'list': [], 'start': None, 'end': None })
                 current_block = blockgroups[-1]
         elif in_group:
             if line[0] == '@':
@@ -59,54 +61,54 @@ def read_block_file (filename):
 
 def refresh (filename, blocks):
     ''' main function to correct the hosts file. '''
-    if verbose: print('refreshing')
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
 
-    # TODO #temporary: assumes only one block group
-    group = blocks[0]
-    within_time = False
     now = dt.time(dt.now())
-    midnight = datetime.time(0, 0)
-    if group['start'] < group['end']:
-        within_time = now > group['start'] and now < group['end']
-    else:
-        within_time = (now > group['start'] and now < midnight) or \
-                      (now < group['end']   and now > midnight)
+    day_start = datetime.time(0, 0)
+    day_end = datetime.time(23, 59)
+    newdata = data[:]
 
-    if within_time:
-        # construct lines of new file
-        blockentries = [ '0.0.0.0\t'+i+'\n' for i in group['list'] ]
-        newdata = data[:]
-        for entry in blockentries:
-            if entry not in data:
-                if '#'+entry in data:
-                    # uncomment the line
-                    if verbose: print(entry[:-1], 'is commented at line', data.index('#'+entry))
-                    newdata[data.index('#'+entry)] = entry
-                else:
-                    # add the line
-                    if verbose: print(entry[:-1], 'is missing')
-                    newdata.append(entry)
-            else:
-                if verbose: print(entry[:-1], 'is present, at line', data.index(entry))
-
-        if data == newdata:
-            # file has not changed - don't bother writing
-            if verbose: print('nothing\'s changed!')
+    for group in blocks:
+        if verbose: print('group', group['name'], '(', group['start'], '->', group['end'], '):')
+        # check time constraints
+        within_time = False
+        if group['start'] < group['end']:
+            within_time = now > group['start'] and now < group['end']
         else:
-            # update the file
-            with open(filename, 'w') as f:
-                f.writelines(newdata)
-            print('refreshed')
-    elif verbose: print('not in time range', group['start'], '->',  group['end'])
+            within_time = (now >= group['start'] and now <= day_end) or \
+                          (now <= group['end']   and now >= day_start)
+
+        if within_time:
+            # construct lines of new file
+            blockentries = [ '0.0.0.0\t'+i+'\n' for i in group['list'] ]
+            for entry in blockentries:
+                if entry not in data:
+                    if '#'+entry in data:
+                        # uncomment the line
+                        if verbose: print('\t', entry[:-1], 'is commented at line', data.index('#'+entry))
+                        newdata[data.index('#'+entry)] = entry
+                    else:
+                        # add the line
+                        if verbose: print('\t', entry[:-1], 'is missing')
+                        newdata.append(entry)
+        elif verbose: print('\t not in time range', group['start'], '->',  group['end'])
+
+    if data == newdata:
+        # file has not changed - don't bother writing
+        if verbose: print('-- nothing\'s changed!')
+    else:
+        # update the file
+        with open(filename, 'w') as f:
+            f.writelines(newdata)
+        if verbose: print('-- refreshed')
 
 def main ():
-    if verbose: print('refreshing', sys.argv[1], 'using blocklist', sys.argv[2])
+    if verbose: print('-- refreshing', sys.argv[1], 'using blocklist', sys.argv[2])
     to_refresh = sys.argv[1]
-    blocklist = read_block_file(sys.argv[2])
-    refresh(to_refresh, blocklist)
+    blocks = read_block_file(sys.argv[2])
+    refresh(to_refresh, blocks)
 
 if __name__ == '__main__':
     main()
