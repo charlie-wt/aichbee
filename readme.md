@@ -20,7 +20,8 @@ a website blocker.
 ### maybe
 * slightly more unify technologies used.
 	* just python: could possibly use `python3-pyinotify` package to do what the bash currently does.
-	* jsut bash: could get messy trying to do all the blocklist parsing/applying schedules, bash not really made for that sort of thing. limits platform-agnosticism.
+	* just bash: could get messy trying to do all the blocklist parsing/applying schedules, bash not really made for that sort of thing. limits platform-agnosticism.
+	* just C: would be sort of nice as an exercise, and is always for the user if it takes fewer resources (provided no memory issues etc.), but this sort of program feels really more suited to a scripting language.
 * allow blocking of launching programs as well as websites.
 * graphical front-end.
 * support for different systems (non-systemd, macOS, windows)
