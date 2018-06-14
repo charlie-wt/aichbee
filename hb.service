@@ -4,6 +4,7 @@ After=multi-user.target graphical.target network-online.target
 [Service]
 Type=simple
 Restart=always
+RestartSec=10
 TimeoutSec=2
 ExecStart=/home/charlie/Programming/python/hb/bl.sh
 User=root
