@@ -5,7 +5,7 @@ a website blocker.
 ## dependencies
 
 * python 3
-* inotify-tools
+	* [inotify_simple](https://pypi.org/project/inotify_simple/)
 * systemd
 
 ## todo

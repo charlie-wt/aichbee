@@ -6,7 +6,8 @@ Type=simple
 Restart=always
 RestartSec=10
 TimeoutSec=2
-ExecStart=/home/charlie/Programming/python/hb/bl.sh
+WorkingDirectory=/home/charlie/Programming/python/hb
+ExecStart=/home/charlie/Programming/python/hb/main.py
 User=root
 [Install]
 WantedBy=multi-user.target
