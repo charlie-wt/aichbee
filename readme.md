@@ -11,8 +11,8 @@ a website blocker.
 ## todo
 
 ### definitely
-* implement multiple block groups
-* implement multiple time constraints on a group (so long as they don't clash)
+* automatically unblock in off-time, instead of just allowing one to unblock.
+* implement multiple time constraints on a group (so long as they don't clash).
 * limit the ability to edit the blocklist and have the changes be recognised by the program.
 	* maybe just make it take a day/reboot/something for changes to the blockfile to be recognised?
 	* could only allow at times when blocks are off

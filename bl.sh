@@ -12,7 +12,6 @@ python3 $scr/refresh.py "$dir/$fname" "$scr/$blocklist"
 inotifywait -e close_write -m $dir |
 while read -r directory events filename; do
   if [ "$filename" = "$fname" ]; then
-    # echo "refreshing" "$dir/$fname" "with blocklist" "$blocklist!"
     python3 $scr/refresh.py "$dir/$fname" "$scr/$blocklist"
   fi
 done
