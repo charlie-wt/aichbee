@@ -74,7 +74,9 @@ def refresh (filename, blocks):
         if verbose: print('group', group['name'], '(', group['start'], '->', group['end'], '):')
         # check time constraints
         within_time = False
-        if group['start'] < group['end']:
+        if group['start'] is None or group['end'] is None:
+            within_time = true
+        elif group['start'] < group['end']:
             within_time = now > group['start'] and now < group['end']
         else:
             within_time = (now >= group['start'] and now <= day_end) or \
