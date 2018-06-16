@@ -20,15 +20,6 @@ def within_time (group):
 
     return within
 
-def refresh (filename, blocks):
-    # TODO: currently unused
-    # TODO #performance: wasteful file i/o
-    for group in blocks:
-        if within_time(group):
-            block(filename, group)
-        else:
-            unblock(filename, group)
-
 def block (filename, blocks):
     ''' main function to correct the hosts file. '''
     # get the data from the file
