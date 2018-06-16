@@ -12,6 +12,7 @@ a website blocker.
 
 ### definitely
 * implement multiple time constraints on a group (so long as they don't clash).
+* make the install location-independent
 
 ### maybe
 * allow blocking of launching programs as well as websites.
