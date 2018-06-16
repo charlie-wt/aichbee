@@ -11,6 +11,7 @@ def main ():
     num_args = len(sys.argv)
     bf.verbose = True
     rf.verbose = True
+    verbose = True
 
     # file to watch (default /etc/hosts)
     target = '/etc/hosts'
@@ -31,25 +32,27 @@ def main ():
     wd = inotify.add_watch(ref_dir, watch_flags)
 
     # read events, maybe respond
-    # TODO #performance: using infinite loop. could see if I could use events, and would that be better?
+    rf.block(target, blocks)
     prevtime = dt.time(dt.now())
     while True:
         # check for the start of a group's time constrains
         now = dt.time(dt.now())
-        print('checking now (', now, ') against:')
         for group in blocks:
-            print('\t', group['name'], ':', group['start'], '->', group['end'])
             if prevtime < group['start'] and now > group['start']:
-                print('\t\t time start for group', group['name'])
-                rf.refresh(target, group)
+                if verbose:
+                    print('time start for group', group['name'], '(',
+                          group['start'], '<', now, '<', group['end'], ')')
+                rf.block(target, group)
             if prevtime < group['end'] and now > group['end']:
-                print('\t\t time end for group', group['name'])
+                if verbose:
+                    print('time end for group', group['name'], '(',
+                          group['start'], '<', group['end'], '<', now, ')')
                 rf.unblock(target, group)
         prevtime = now
         # check for file modification events
-        for event in inotify.read():
+        for event in inotify.read(timeout=30000):
             if event[3] == ref_file:
-                rf.refresh(target, blocks)
+                rf.block(target, blocks)
 
 if __name__ == '__main__':
     main()

@@ -23,13 +23,15 @@ def read (filename):
         if line[-1] == '\n': line = line[:-1]
 
         if line[0] == "=":
-            # lines beginning with '=' mark the start & end of individual block groups
+            # lines starting with '=' mark the start/end of block groups
             if in_group:
                 in_group = False
             else:
                 in_group = True
                 name = line[1:] if line[1] != ' ' else line[2:]
-                blockgroups.append({ 'name': name, 'list': [], 'start': None, 'end': None })
+                blockgroups.append(
+                    { 'name': name, 'list': [], 'start': None, 'end': None }
+                )
                 current_block = blockgroups[-1]
         elif in_group:
             if line[0] == '@':
@@ -39,7 +41,6 @@ def read (filename):
                 end_str = l[l.index('-')+1:len(l)]
                 block_start = dt.strptime(start_str, '%H:%M').time()
                 block_end = dt.strptime(end_str, '%H:%M').time()
-                if verbose: print(block_start, '->', block_end)
                 current_block['start'] = block_start
                 current_block['end'] = block_end
             else:
@@ -48,8 +49,8 @@ def read (filename):
     # add www./non www. versions if necessary
     for group in blockgroups:
         orig = group['list'][:]
-        group['list'] += [ 'www.' + item for item in orig if not item.startswith('www.') ]
-        group['list'] += [ item[4:] for item in orig if item.startswith('www.') ]
+        group['list'] += [ 'www.'+i for i in orig if not i.startswith('www.') ]
+        group['list'] += [ i[4:] for i in orig if i.startswith('www.') ]
 
     # if verbose: print(blockgroups)
 
