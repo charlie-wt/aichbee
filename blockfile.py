@@ -1,5 +1,6 @@
 import datetime
 from datetime import datetime as dt
+import refresh as rf
 
 verbose = False
 
@@ -11,12 +12,8 @@ def read (filename):
     with open(filename, 'r') as f:
         data = f.readlines()
 
-    # TODO #functionality: allow multiple time constraint rules?
-    #                      - would need to check consistency, I think
-    block_start = None
-    block_end = None
-    block_starts = None
-    block_ends = None
+    # block_start = None
+    # block_end = None
     current_group = None
     # get just the blocked domains
     in_group = False
@@ -32,7 +29,8 @@ def read (filename):
                 in_group = True
                 name = line[1:] if line[1] != ' ' else line[2:]
                 blockgroups.append(
-                    { 'name': name, 'list': [], 'start': None, 'end': None, 'starts': [], 'ends': [] }
+                    # { 'name': name, 'list': [], 'start': None, 'end': None, 'starts': [], 'ends': [] }
+                    { 'name': name, 'list': [], 'starts': [], 'ends': [] }
                 )
                 current_group = blockgroups[-1]
         elif in_group:
@@ -43,8 +41,6 @@ def read (filename):
                 end_str = l[l.index('-')+1:len(l)]
                 block_start = dt.strptime(start_str, '%H:%M').time()
                 block_end = dt.strptime(end_str, '%H:%M').time()
-                current_group['start'] = block_start
-                current_group['end'] = block_end
                 current_group['starts'].append(block_start)
                 current_group['ends'].append(block_end)
                 if not constraints_consistent(current_group):
@@ -72,10 +68,15 @@ def constraints_consistent (group):
     for i in range(len(group['starts'])):
         for j in range(len(group['starts'])):
             if i != j:
-                bad_start = group['starts'][i] > group['starts'][j] and \
-                            group['starts'][i] < group['ends'][j]
-                bad_end = group['ends'][i] > group['starts'][j] and \
-                          group['ends'][i] < group['ends'][j]
+                # TODO #bug: currently throws an error if one constraint ends
+                #            as another one starts (though there's currently
+                #            not really any reason someone would do this).
+                bad_start = rf.within_time(now=group['starts'][i],
+                                           starts=group['starts'][j],
+                                           ends=group['ends'][j])
+                bad_end = rf.within_time(now=group['ends'][i],
+                                           starts=group['starts'][j],
+                                           ends=group['ends'][j])
 
                 if bad_start or bad_end:
                     if verbose:
