@@ -12,10 +12,8 @@ def read (filename):
     with open(filename, 'r') as f:
         data = f.readlines()
 
-    # block_start = None
-    # block_end = None
-    current_group = None
     # get just the blocked domains
+    current_group = None
     in_group = False
     for line in data:
         if line == '\n' or line[0] == '#': continue
@@ -29,7 +27,6 @@ def read (filename):
                 in_group = True
                 name = line[1:] if line[1] != ' ' else line[2:]
                 blockgroups.append(
-                    # { 'name': name, 'list': [], 'start': None, 'end': None, 'starts': [], 'ends': [] }
                     { 'name': name, 'list': [], 'starts': [], 'ends': [] }
                 )
                 current_group = blockgroups[-1]
@@ -43,6 +40,7 @@ def read (filename):
                 block_end = dt.strptime(end_str, '%H:%M').time()
                 current_group['starts'].append(block_start)
                 current_group['ends'].append(block_end)
+
                 if not constraints_consistent(current_group):
                     n = (current_group['name'] if current_group['name'] else '')
                     raise ValueError('time constraints on block group ' + \
@@ -55,8 +53,6 @@ def read (filename):
         orig = group['list'][:]
         group['list'] += [ 'www.'+i for i in orig if not i.startswith('www.') ]
         group['list'] += [ i[4:] for i in orig if i.startswith('www.') ]
-
-    # if verbose: print(blockgroups)
 
     # return results
     return blockgroups

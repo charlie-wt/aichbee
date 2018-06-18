@@ -38,19 +38,15 @@ def main ():
         # check for the start of a group's time constrains
         now = dt.time(dt.now())
         for group in blocks:
-            # if prevtime < start and now > start:
             if not rf.within_time(group=group, now=prevtime) and \
                rf.within_time(group=group, now=now):
                 if verbose:
-                    print('time start for group', group['name'])#, '(',
-                          # start, '<', now, '<', group['end'], ')')
+                    print('time start for group', group['name'])
                 rf.block(target, group)
-            # if prevtime < end and now > end:
             if rf.within_time(group=group, now=prevtime) and \
                not rf.within_time(group=group, now=now):
                 if verbose:
-                    print('time end for group', group['name'])#, '(',
-                          # start, '<', group['end'], '<', now, ')')
+                    print('time end for group', group['name'])
                 rf.unblock(target, group)
         prevtime = now
         # check for file modification events

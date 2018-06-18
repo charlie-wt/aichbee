@@ -40,8 +40,6 @@ def block (filename, blocks):
 
     for group in blocks:
         if verbose:
-            # print('group', group['name'], '(', group['start'], '->',
-            #       group['end'], '):')
             print('group', group['name'], ':')
         if within_time(group=group):
             # construct lines of new file
@@ -59,7 +57,7 @@ def block (filename, blocks):
                         if verbose: print('\t', entry[:-1], 'is missing')
                         newdata.append(entry)
         elif verbose:
-            print('\t not in time range')#, group['start'], '->', group['end'])
+            print('\t not in time range')
 
     if data == newdata:
         # file has not changed - don't bother writing
