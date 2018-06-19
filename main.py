@@ -31,9 +31,14 @@ def main ():
     watch_flags = flags.MODIFY
     wd = inotify.add_watch(ref_dir, watch_flags)
 
-    # read events, maybe respond
-    rf.block(target, blocks)
     prevtime = dt.time(dt.now())
+    # TODO #performance: not particularly efficient
+    for group in blocks:
+        if rf.within_time(group=group, now=prevtime):
+            rf.block(target, group)
+        else:
+            rf.unblock(target, group)
+    # read events, maybe respond
     while True:
         # check for the start of a group's time constrains
         now = dt.time(dt.now())
