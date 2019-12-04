@@ -8,10 +8,11 @@ import blockfile as bf
 import refresh as rf
 
 def main ():
+    print('hello hello hello')
     num_args = len(sys.argv)
-    bf.verbose = True
-    rf.verbose = True
-    verbose = True
+    bf.verbose = False
+    rf.verbose = False
+    verbose = False
 
     # file to watch (default /etc/hosts)
     target = '/etc/hosts'
@@ -19,13 +20,14 @@ def main ():
     ref_dir  = target[:target.rfind('/')+1]
     ref_file = target[target.rfind('/')+1:]
 
-    # location of blocklist file (default ./blocklist.txt)
+    # location of blocklist file (default ./blocklist)
     blocks = None
     if num_args >= 3:
         blocks = bf.read(sys.argv[2])
     else:
         blocks = bf.read('./blocklist')
 
+    print(ref_dir)
     # configure inotify
     inotify = INotify()
     watch_flags = flags.MODIFY
