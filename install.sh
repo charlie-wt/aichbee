@@ -6,7 +6,7 @@ if command -v pip3 > /dev/null; then
     sudo -H pip3 install inotify_simple
   fi
 else
-  sudo apt install pip3 &&
+  sudo apt install python3-pip &&
   sudo -H pip3 install inotify_simple
 fi
 

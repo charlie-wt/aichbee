@@ -46,6 +46,8 @@ def block (filename, blocks):
             blockentries = [ '0.0.0.0\t'+i+'\n' for i in group['list'] ]
             for entry in blockentries:
                 if entry not in data:
+                    # TODO #enhancement: use regex or something -- this doesn't
+                    #                    recognise whitespace* after the '#'.
                     if '#'+entry in data:
                         # uncomment the line
                         if verbose:
