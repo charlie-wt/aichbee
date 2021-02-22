@@ -11,7 +11,7 @@ else
 fi
 
 # install and enable the systemd service (for run-on-startup)
-sudo cp hb.service /etc/systemd/system/ &&
+sudo cp i-am-making-a-bad-decision.service /etc/systemd/system/ &&
 sudo systemctl daemon-reload &&
-sudo systemctl enable hb.service &&
-sudo systemctl start hb.service
+sudo systemctl enable i-am-making-a-bad-decision.service &&
+sudo systemctl start i-am-making-a-bad-decision.service

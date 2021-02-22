@@ -1,0 +1,30 @@
+# blocks are organised into block-groups.
+# to start a group, start a line with "=" followed by a name.
+# to end a group, simply have a line consisting of "=".
+
+= my daily blocks
+# constrain your blocks in time by using the '@' symbol.
+@ 12:00 - 13:00
+# you can have multiple constraints, but they can't overlap.
+# you can make time spans 'wrap around' midnight too.
+@ 18:00 - 06:00
+
+# list of sites to block. "www." variants are added automatically.
+reddit.com
+facebook.com
+twitter.com
+=
+
+
+= my weekly blocks
+# you can make weekday-based constraints too, via the first three letters of the day.
+# like the time-only constraints, these shouldn't overlap.
+@ mon 00:00 - fri 23:59
+@ sat 20:00 - sat 23:59
+
+# you can have time-only & day-based constraints at the same time.
+@ 23:00 - 06:00
+
+youtube.com
+twitch.tv
+=

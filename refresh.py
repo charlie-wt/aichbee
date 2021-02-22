@@ -1,36 +1,56 @@
-import datetime
-from datetime import datetime as dt
+from enum import Enum, auto
+import re
+
+from blockgroup import BlockGroup
 
 verbose = False
 
-def within_time (group=None, now=None, starts=None, ends=None):
-    ''' check time constraints. '''
 
-    if now is None: now = dt.time(dt.now())
-    if starts is None and group is not None: starts = group['starts']
-    if type(starts) is not list: starts = [starts]
-    if ends is None and group is not None: ends = group['ends']
-    if type(ends) is not list: ends = [ends]
+class BlockedState(Enum):
+    ''' The state of a given blocked site in the watched file (ie. `hosts`). '''
+    BLOCKED = auto()
+    COMMENTED = auto()
+    ABSENT = auto()
 
-    day_start = datetime.time(0, 0)
-    day_end = datetime.time(23, 59)
 
-    if starts == [] or ends == []:
-        return True
+def blocked_state (site: str, watchfile_lines: [str]) -> (BlockedState, [int]):
+    '''
+    Get the state of the given site, within the given 'watch file' lines (eg. those
+    of `hosts`)
 
-    for i in range(len(starts)):
-        if starts[i] < ends[i]:
-            if now >= starts[i] and now <= ends[i]:
-                return True
-        else:
-            if (now >= starts[i] and now <= day_end) or \
-               (now <= ends[i]   and now >= day_start):
-                return True
+    '''
 
-    return False
+    blocked_regex = re.compile('0.0.0.0\s+' + site)
+    commented_regex = re.compile('#\s*0.0.0.0\s+' + site)
 
-def block (filename, blocks):
-    ''' main function to correct the hosts file. '''
+    blocked_lines = []
+    commented_lines = []
+
+    blocked = False
+
+    # get the lines of `watchfile_lines` that contain (un)commented entries for `site`
+    for n,l in enumerate(watchfile_lines):
+        if blocked_regex.match(l):
+            blocked = True
+            blocked_lines.append(n)
+
+        if blocked:
+            continue
+
+        if commented_regex.match(l):
+            commented_lines.append(n)
+
+    # return list of line numbers based on blocked status of `site`.
+    if blocked:
+        return (BlockedState.BLOCKED, blocked_lines)
+    elif len(commented_lines) > 0:
+        return (BlockedState.COMMENTED, commented_lines)
+    else:
+        return (BlockedState.ABSENT, [])
+
+
+def block (filename: str, blocks: [BlockGroup]):
+    ''' Main function to correct the hosts file. '''
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
@@ -39,27 +59,33 @@ def block (filename, blocks):
     if type(blocks) is not list: blocks = [blocks]
 
     for group in blocks:
-        if verbose:
-            print('group', group['name'], ':')
-        if within_time(group=group):
-            # construct lines of new file
-            blockentries = [ '0.0.0.0\t'+i+'\n' for i in group['list'] ]
-            for entry in blockentries:
-                if entry not in data:
-                    # TODO #enhancement: use regex or something -- this doesn't
-                    #                    recognise whitespace* after the '#'.
-                    if '#'+entry in data:
-                        # uncomment the line
-                        if verbose:
-                            print('\t', entry[:-1], 'is commented at line',
-                            data.index('#'+entry))
-                        newdata[data.index('#'+entry)] = entry
-                    else:
-                        # add the line
-                        if verbose: print('\t', entry[:-1], 'is missing')
-                        newdata.append(entry)
-        elif verbose:
-            print('\t not in time range')
+        if verbose: print('group', group.name, ':')
+
+        # if not within_time(group=group):
+        if not group.within_time():
+            if verbose: print('\t not in time range')
+            continue
+
+        # this site should be blocked -- construct lines of new file
+        for site in group.sites:
+            state, lines = blocked_state(site, data)
+
+            # site is already blocked
+            if state == BlockedState.BLOCKED:
+                continue
+
+            entry = '0.0.0.0\t' + site + '\n'
+
+            # site is commented out -- uncomment
+            if state == BlockedState.COMMENTED:
+                if verbose: print('\t', entry[:-1], 'is commented on lines', lines)
+                for l in lines:
+                    newdata[l] = entry
+                continue
+
+            # site is absent -- add
+            if verbose: print('\t', entry[:-1], 'is missing')
+            newdata.append(entry)
 
     if data == newdata:
         # file has not changed - don't bother writing
@@ -70,10 +96,13 @@ def block (filename, blocks):
             f.writelines(newdata)
         if verbose: print('-- blocked')
 
-def unblock (filename, blocks):
-    ''' unblock all websites in the blocks, applied one-by-one. to be used after
+
+def unblock (filename: str, blocks: [BlockGroup]):
+    ''' Unblock all websites in the blocks, applied one-by-one. To be used after
     a schedule finishes.
+
     '''
+
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
@@ -82,10 +111,10 @@ def unblock (filename, blocks):
     if type(blocks) is not list: blocks = [blocks]
 
     for group in blocks:
-        if verbose: print('unblocking group', group['name']+':')
+        if verbose: print('unblocking group', group.name+':')
 
         # construct lines of new file
-        blockentries = [ '#0.0.0.0\t'+i+'\n' for i in group['list'] ]
+        blockentries = [ '#0.0.0.0\t'+i+'\n' for i in group.sites ]
         for entry in blockentries:
             if entry not in data:
                 if entry[1:] in data:
