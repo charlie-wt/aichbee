@@ -16,26 +16,30 @@ A very simple program to set time limits on websites.
 
 '''
 
+
+def arg_or (idx: int, default: str) -> str:
+    return sys.argv[idx] if idx < len(sys.argv) else default
+
+
 def main ():
     timeout_ms = 30000
 
-    num_args = len(sys.argv)
     bf.verbose = False
     rf.verbose = False
     verbose = False
 
-    # file to watch (default /etc/hosts)
-    target = '/etc/hosts'
-    if num_args >= 2: target = sys.argv[1]
-    ref_dir  = target[:target.rfind('/')+1]
-    ref_file = target[target.rfind('/')+1:]
+    # file to watch
+    target_fname = arg_or(1, '/etc/hosts')
+    if verbose: print(f'watching {target_fname}')
 
-    # location of blocklist file (default ./blocklist)
-    blocks = None
-    if num_args >= 3:
-        blocks = bf.read(sys.argv[2])
-    else:
-        blocks = bf.read('./blocklist')
+    ref_dir  = target_fname[:target_fname.rfind('/')+1]
+    ref_file = target_fname[target_fname.rfind('/')+1:]
+
+    # location of blocklist file
+    blocklist_fname = arg_or(2, bf.get_filename())
+    if verbose: print(f'getting blocklist from {blocklist_fname}')
+
+    blocks = bf.read(blocklist_fname)
     if verbose: print(blocks)
 
     # configure inotify
@@ -47,9 +51,9 @@ def main ():
     # TODO #performance: not particularly efficient
     for group in blocks:
         if group.within_time():
-            rf.block(target, group)
+            rf.block(target_fname, group)
         else:
-            rf.unblock(target, group)
+            rf.unblock(target_fname, group)
 
     # read events, maybe respond
     while True:
@@ -58,16 +62,16 @@ def main ():
         for group in blocks:
             if not group.within_time(now=prevtime) and group.within_time(now=now):
                 if verbose: print('time start for group', group.name)
-                rf.block(target, group)
+                rf.block(target_fname, group)
             if group.within_time(now=prevtime) and not group.within_time(now=now):
                 if verbose: print('time end for group', group.name)
-                rf.unblock(target, group)
+                rf.unblock(target_fname, group)
 
         prevtime = now
         # check for file modification events
         for event in inotify.read(timeout=timeout_ms):
             if event[3] == ref_file:
-                rf.block(target, blocks)
+                rf.block(target_fname, blocks)
 
 if __name__ == '__main__':
     main()

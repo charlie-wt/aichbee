@@ -1,5 +1,6 @@
 import datetime
 from datetime import datetime as dt
+import os
 
 from blockgroup import BlockGroup
 import blocktime as bt
@@ -9,8 +10,34 @@ import parse
 verbose = False
 
 
-def read (filename: str) -> [BlockGroup]:
+def get_filename () -> str:
+    '''
+    try to get the blockfile from a standard location; /etc/hb/blocklist if running as
+    root, otherwise tries to use $XDG_CONFIG_HOME (in normal usage should be running as
+    root, since we're modifying /etc/hosts).
+
+    ... not the neatest thing.
+
+    '''
+
+    prefix = '/etc'
+
+    if os.geteuid() != 0:
+        var = os.environ.get('HOME')
+        if var is not None:
+            prefix = var + '/.config'
+        var = os.environ.get('XDG_CONFIG_HOME')
+        if var is not None and (os.path.isdir(var)):
+            prefix = var
+
+    return prefix + '/hb/blocklist'
+
+
+def read (filename: str = None) -> [BlockGroup]:
     ''' read a list of domains to block (like 'blocklist'), from a file. '''
+
+    if filename is None:
+        filename = get_filename()
 
     blockgroups = []
 

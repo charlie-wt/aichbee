@@ -98,7 +98,8 @@ def block (filename: str, blocks: [BlockGroup]):
 
 
 def unblock (filename: str, blocks: [BlockGroup]):
-    ''' Unblock all websites in the blocks, applied one-by-one. To be used after
+    '''
+    Unblock all websites in the blocks, applied one-by-one. To be used after
     a schedule finishes.
 
     '''
