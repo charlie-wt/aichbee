@@ -7,7 +7,7 @@ Restart=always
 RestartSec=10
 TimeoutSec=2
 WorkingDirectory=/home/charlie/src/python/aichbee
-ExecStart=/home/charlie/src/python/aichbee/main.py
+ExecStart=/home/charlie/src/python/aichbee/service.py
 User=root
 [Install]
 WantedBy=multi-user.target
