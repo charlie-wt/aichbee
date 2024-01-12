@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-import datetime
 from datetime import datetime as dt
 from enum import Enum, auto
 from functools import total_ordering
@@ -25,40 +24,63 @@ class Weekday(Enum):
 @dataclass
 class Time:
     time: dt.time
-    day: Weekday = None
+    day: Weekday | None = None
+
+    def __str__ (self):
+        return f'{self.day.name.title()[:3] + " @ " if self.day else ""}' \
+               f'{self.time.strftime("%H:%M")}'
 
     def now () -> 'Time':
         return Time(dt.time(dt.now()), Weekday.now())
 
+    def from_str (time_str: str, day: Weekday | None = None) -> 'Time':
+        return Time(time=dt.strptime(time_str, '%H:%M').time(), day=day)
 
-def within_time (now: Time, starts: [Time], ends: [Time]) -> bool:
+
+@dataclass
+class TimeRange:
+    start: Time
+    end: Time
+
+    def __post_init__ (self):
+        if (self.start.day is None) != (self.end.day is None):
+            raise ValueError('Constraint time range: either *both* the start and end '
+                             'should have a weekday, or *neither* should have a '
+                             f'weekday, but got {self}.')
+
+    def __str__ (self):
+        return f'{self.start} -> {self.end}'
+
+    def time_only (self) -> bool:
+        return self.start.day is None
+
+
+def within_constraints (now: Time | None, ranges: list[TimeRange] | TimeRange) -> bool:
     '''
-    Check time constraints.
+    Check a time against constraints.
 
-    If `now` is `None`, will be set to current system time.
-
+    If `now` is `None`, use current system time.
     If `now.day` is `None`, but there are day-based constraints, will return `False`.
 
     '''
 
     if now is None: now = Time.now()
 
-    if starts == [] or ends == []:
-        return True
+    if not isinstance(ranges, list): ranges = [ranges]
+    if len(ranges) == 0: return True
 
-    for i in range(len(starts)):
+    for r in ranges:
         # do we not have to worry about day-level constraints (no constraints, or all on
         # the same day)?
-        use_time_only = starts[i].day is None or ends[i].day is None
-        use_time_only = use_time_only or \
-            (now.day is not None and now.day == starts[i].day == ends[i].day)
+        use_time_only = r.time_only() or \
+            (now.day is not None and now.day == r.start.day == r.end.day)
         if use_time_only:
-            # don't care about days -- check by time constraint only.
-            if starts[i].time < ends[i].time:
-                if now.time >= starts[i].time and now.time <= ends[i].time:
+            if r.start.time <= r.end.time:
+                if r.start.time <= now.time <= r.end.time:
                     return True
             else:
-                if now.time >= starts[i].time or now.time <= ends[i].time:  # wraparound
+                # wraparound
+                if now.time >= r.start.time or now.time <= r.end.time:
                     return True
             continue
 
@@ -66,28 +88,26 @@ def within_time (now: Time, starts: [Time], ends: [Time]) -> bool:
             return False
 
         # are we on a 'border day' of the day-based constraints? if so, check the times.
-        if now.day == starts[i].day:
-            if now.time >= starts[i].time:
+        if now.day == r.start.day:
+            if now.time >= r.start.time:
                 return True
             continue
-        if now.day == ends[i].day:
-            if now.time <= ends[i].time:
+        if now.day == r.end.day:
+            if now.time <= r.end.time:
                 return True
             continue
 
         # are we completely inside the day-based constraints?
-        if starts[i].day == ends[i].day:
-            if starts[i].time < ends[i].time:
-                if now.day > starts[i].day and now.day < ends[i].day:
-                    return True
-            else:
-                if now.day > starts[i].day or now.day < ends[i].day:  # wraparound
-                    return True
-        elif starts[i].day < ends[i].day:
-            if now.day > starts[i].day and now.day < ends[i].day:
+        if r.start.day == r.end.day:
+            # wraparound (we've already covered the non-wraparound & time-based-checking
+            # cases at the top)
+            if r.start.time > r.end.time and now.day != r.start.day:
+                return True
+        elif r.start.day < r.end.day:
+            if r.start.day < now.day < r.end.day:
                 return True
         else:
-            if now.day > starts[i].day or now.day < ends[i].day:  # wraparound
+            if now.day > r.start.day or now.day < r.end.day:  # wraparound
                 return True
 
     return False

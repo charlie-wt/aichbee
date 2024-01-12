@@ -1,76 +1,73 @@
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime as dt
 import re
 
 from blockgroup import BlockGroup
-from blocktime import Weekday, Time
+from blocktime import Time, TimeRange, Weekday
 
 
-def constraint_line (line: str, group: BlockGroup, verbose: bool = False):
-    if re.match('.*[a-zA-Z].*', line) is not None:
-        # if there are words on the line, they're day names.
-        day_line(line, group, verbose)
-    else:
-        time_line(line, group)
+NAME_PAT = re.compile(r'\s*=\s*(.*)\s*')
 
 
-def time_line (line: str, group: BlockGroup):
-    l = line.replace(' ', '').replace('\t', '')
-
-    start_str = l[1:l.index('-')]
-    end_str   = l[l.index('-')+1:]
-
-    block_start = dt.strptime(start_str, '%H:%M').time()
-    block_end   = dt.strptime(end_str, '%H:%M').time()
-
-    group.starts.append(Time(block_start))
-    group.ends.append(Time(block_end))
+def parse_name (line: str) -> str | None:
+    if m := re.match(NAME_PAT, line):
+        return m.group(1)
+    return None
 
 
-def day_line (line: str, group: BlockGroup, verbose: bool = False):
-    l = line.replace(' ', '').replace('\t', '')
+def parse_time_constraint (m: re.Match, group: BlockGroup):
+    start = Time.from_str(time_str=m.group('start_time'))
+    end = Time.from_str(time_str=m.group('end_time'))
 
-    # get the string components
-    start_str = l[1:l.index('-')]
-    end_str   = l[l.index('-')+1:]
+    group.ranges.append(TimeRange(start, end))
 
-    start_day_str  = start_str[:3]
-    start_time_str = start_str[3:]
 
-    end_day_str  = end_str[:3]
-    end_time_str = end_str[3:]
+def parse_day_constraint (m: re.Match, group: BlockGroup):
+    start = Time.from_str(time_str=m.group('start_time'), day=day(m.group('start_day')))
+    end = Time.from_str(time_str=m.group('end_time'), day=day(m.group('end_day')))
 
-    # make data structures
-    start_time = dt.strptime(start_time_str, '%H:%M').time()
-    end_time   = dt.strptime(end_time_str, '%H:%M').time()
+    group.ranges.append(TimeRange(start, end))
 
-    start_day = day(start_day_str)
-    end_day   = day(end_day_str)
 
-    if start_day is None or end_day is None:
-        if verbose:
-            print('error parsing day constaints ("'
-                  + start_day_str + '"-"' + end_day_str + '") of block group.')
-        return
+@dataclass
+class LineType:
+    regex: re.Pattern
+    handler: Callable[[re.Match, BlockGroup], None]
 
-    # append to input group
-    group.starts.append(Time(start_time, start_day))
-    group.ends.append(Time(end_time, end_day))
+
+HANDLERS = [
+    LineType(re.compile(r'\s*@\s*'
+                        r'(?P<start_time>\d\d:\d\d)\s*-\s*'
+                        r'(?P<end_time>\d\d:\d\d)\s*'),
+             parse_time_constraint),
+    LineType(re.compile(r'\s*@\s*'
+                        r'(?P<start_day>\w+)\s*'
+                        r'(?P<start_time>\d\d:\d\d)\s*-\s*'
+                        r'(?P<end_day>\w+)\s*'
+                        r'(?P<end_time>\d\d:\d\d)\s*'),
+             parse_day_constraint),
+]
+
+
+def parse_constraint (line: str, group: BlockGroup) -> None:
+    ''' add the parsed constraint line `line` to BlockGroup `group`, or raise a
+    ValueError.
+    '''
+    for h in HANDLERS:
+        if m := re.match(h.regex, line):
+            h.handler(m, group)
+            return
+    raise ValueError(f"Couldn't parse blocklist line: '{line}'")
 
 
 def day (string: str) -> Weekday:
-    string = string.lower()
-    if string == 'mon':
-        return Weekday.MONDAY
-    if string == 'tue':
-        return Weekday.TUESDAY
-    if string == 'wed':
-        return Weekday.WEDNESDAY
-    if string == 'thu':
-        return Weekday.THURSDAY
-    if string == 'fri':
-        return Weekday.FRIDAY
-    if string == 'sat':
-        return Weekday.SATURDAY
-    if string == 'sun':
-        return Weekday.SUNDAY
-    return None
+    ''' parse `string` into a Weekday (based on it being the prefix of a weekday), or
+    raise a ValueError.
+    '''
+    s = string.lower()
+    for d in Weekday:
+        if d.name.lower().startswith(s):
+            return d
+
+    raise ValueError(f"Couldn't parse weekday '{string}'")

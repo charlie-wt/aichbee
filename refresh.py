@@ -3,7 +3,11 @@ import re
 
 from blockgroup import BlockGroup
 
+
 verbose = False
+
+def log (*args, **kwargs):
+    if verbose: print(*args, **kwargs)
 
 
 class BlockedState(Enum):
@@ -13,7 +17,7 @@ class BlockedState(Enum):
     ABSENT = auto()
 
 
-def blocked_state (site: str, watchfile_lines: [str]) -> (BlockedState, [int]):
+def blocked_state (site: str, watchfile_lines: list[str]) -> (BlockedState, list[int]):
     '''
     Get the state of the given site, within the given 'watch file' lines (eg. those
     of `hosts`)
@@ -49,21 +53,20 @@ def blocked_state (site: str, watchfile_lines: [str]) -> (BlockedState, [int]):
         return (BlockedState.ABSENT, [])
 
 
-def block (filename: str, blocks: [BlockGroup]):
+def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
     ''' Main function to correct the hosts file. '''
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
 
     newdata = data[:]
-    if type(blocks) is not list: blocks = [blocks]
+    if not isinstance(blocks, list): blocks = [blocks]
 
     for group in blocks:
-        if verbose: print('group', group.name, ':')
+        log('group', group.display_name(), ':')
 
-        # if not within_time(group=group):
-        if not group.within_time():
-            if verbose: print('\t not in time range')
+        if not group.within_constraints():
+            log('\t not in time range')
             continue
 
         # this site should be blocked -- construct lines of new file
@@ -78,26 +81,26 @@ def block (filename: str, blocks: [BlockGroup]):
 
             # site is commented out -- uncomment
             if state == BlockedState.COMMENTED:
-                if verbose: print('\t', entry[:-1], 'is commented on lines', lines)
+                log('\t', entry[:-1], 'is commented on lines', lines)
                 for l in lines:
                     newdata[l] = entry
                 continue
 
             # site is absent -- add
-            if verbose: print('\t', entry[:-1], 'is missing')
+            log('\t', entry[:-1], 'is missing')
             newdata.append(entry)
 
     if data == newdata:
         # file has not changed - don't bother writing
-        if verbose: print('-- nothing\'s changed!')
+        log('-- nothing\'s changed!')
     else:
         # update the file
         with open(filename, 'w') as f:
             f.writelines(newdata)
-        if verbose: print('-- blocked')
+        log('-- blocked')
 
 
-def unblock (filename: str, blocks: [BlockGroup]):
+def unblock (filename: str, blocks: list[BlockGroup] | BlockGroup):
     '''
     Unblock all websites in the blocks, applied one-by-one. To be used after
     a schedule finishes.
@@ -109,10 +112,10 @@ def unblock (filename: str, blocks: [BlockGroup]):
         data = f.readlines()
 
     newdata = data[:]
-    if type(blocks) is not list: blocks = [blocks]
+    if not isinstance(blocks, list): blocks = [blocks]
 
     for group in blocks:
-        if verbose: print('unblocking group', group.name+':')
+        log(f'unblocking group {group.display_name()}:')
 
         # construct lines of new file
         blockentries = [ '#0.0.0.0\t'+i+'\n' for i in group.sites ]
@@ -127,9 +130,9 @@ def unblock (filename: str, blocks: [BlockGroup]):
 
     if data == newdata:
         # file has not changed - don't bother writing
-        if verbose: print('-- nothing\'s changed!')
+        log('-- nothing\'s changed!')
     else:
         # update the file
         with open(filename, 'w') as f:
             f.writelines(newdata)
-        if verbose: print('-- unblocked')
+        log('-- unblocked')
