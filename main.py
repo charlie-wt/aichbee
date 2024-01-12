@@ -25,9 +25,9 @@ def log (*args, **kwargs):
 
 def parse_args ():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--target',
+    parser.add_argument('-w', '--watchfile',
                         default=os.path.abspath(os.path.join(os.path.sep, 'etc', 'hosts')),
-                        help='Path to hosts file to manage.')
+                        help='Path to file to watch & manage (eg. hosts).')
     parser.add_argument('-b', '--blocklist',
                         default=bf.get_filename(),
                         help='Path to blocklist to enforce.')
@@ -37,15 +37,14 @@ def parse_args ():
 def main ():
     timeout_ms = 30000
 
-    bf.verbose = False
     rf.verbose = True
 
     args = parse_args()
 
     # file to watch
-    args.target = os.path.abspath(args.target)
-    log(f'watching {args.target}')
-    target_dir, target_file = os.path.split(args.target)
+    args.watchfile = os.path.abspath(args.watchfile)
+    log(f'watching {args.watchfile}')
+    watchfile_dir, watchfile_file = os.path.split(args.watchfile)
 
     # location of blocklist file
     log(f'getting blocklist from {args.blocklist}')
@@ -55,15 +54,15 @@ def main ():
     # configure inotify
     inotify = INotify()
     watch_flags = flags.MODIFY
-    wd = inotify.add_watch(target_dir, watch_flags)
+    wd = inotify.add_watch(watchfile_dir, watch_flags)
 
     prevtime = Time.now()
     # TODO #performance: not particularly efficient
     for group in blocks:
         if group.within_constraints():
-            rf.block(args.target, group)
+            rf.block(args.watchfile, group)
         else:
-            rf.unblock(args.target, group)
+            rf.unblock(args.watchfile, group)
 
     # read events, maybe respond
     while True:
@@ -72,16 +71,16 @@ def main ():
         for group in blocks:
             if not group.within_constraints(prevtime) and group.within_constraints(now):
                 log(f'time start for group {group.display_name()}')
-                rf.block(args.target, group)
+                rf.block(args.watchfile, group)
             if group.within_constraints(prevtime) and not group.within_constraints(now):
                 log(f'time end for group {group.display_name()}')
-                rf.unblock(args.target, group)
+                rf.unblock(args.watchfile, group)
 
         prevtime = now
         # check for file modification events
         for event in inotify.read(timeout=timeout_ms):
-            if event[3] == target_file:
-                rf.block(args.target, blocks)
+            if event[3] == watchfile_file:
+                rf.block(args.watchfile, blocks)
 
 if __name__ == '__main__':
     main()

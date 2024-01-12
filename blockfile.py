@@ -6,9 +6,6 @@ import blocktime as bt
 import parse
 
 
-verbose = False
-
-
 def get_filename () -> str:
     '''
     try to get the blockfile from a standard location; /etc/hb/blocklist if running as

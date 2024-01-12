@@ -17,6 +17,21 @@ class BlockedState(Enum):
     ABSENT = auto()
 
 
+WATCHFILE_REGEXES = {}
+
+
+def line_match(site: str, watchfile_line: str) -> BlockedState:
+    regex = WATCHFILE_REGEXES.get(site)
+    if regex is None:
+        regex = re.compile(r'\s*(#\s*)?0.0.0.0\s+' + site)
+        WATCHFILE_REGEXES[site] = regex
+    if m := regex.match(watchfile_line):
+        if m.group(1) is None:
+            return BlockedState.BLOCKED
+        return BlockedState.COMMENTED
+    return BlockedState.ABSENT
+
+
 def blocked_state (site: str, watchfile_lines: list[str]) -> (BlockedState, list[int]):
     '''
     Get the state of the given site, within the given 'watch file' lines (eg. those
@@ -24,30 +39,23 @@ def blocked_state (site: str, watchfile_lines: list[str]) -> (BlockedState, list
 
     '''
 
-    blocked_regex = re.compile('0.0.0.0\s+' + site)
-    commented_regex = re.compile('#\s*0.0.0.0\s+' + site)
-
     blocked_lines = []
     commented_lines = []
 
-    blocked = False
-
     # get the lines of `watchfile_lines` that contain (un)commented entries for `site`
-    for n,l in enumerate(watchfile_lines):
-        if blocked_regex.match(l):
-            blocked = True
-            blocked_lines.append(n)
+    for i, line in enumerate(watchfile_lines):
+        state = line_match(site, line)
 
-        if blocked:
-            continue
-
-        if commented_regex.match(l):
-            commented_lines.append(n)
+        if state == BlockedState.BLOCKED:
+            blocked_lines.append(i)
+            # can't break, as the site may be in the file multiple times
+        elif state == BlockedState.COMMENTED:
+            commented_lines.append(i)
 
     # return list of line numbers based on blocked status of `site`.
-    if blocked:
+    if blocked_lines:
         return (BlockedState.BLOCKED, blocked_lines)
-    elif len(commented_lines) > 0:
+    elif commented_lines:
         return (BlockedState.COMMENTED, commented_lines)
     else:
         return (BlockedState.ABSENT, [])
@@ -63,7 +71,7 @@ def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
     if not isinstance(blocks, list): blocks = [blocks]
 
     for group in blocks:
-        log('group', group.display_name(), ':')
+        log(f'group {group.display_name()}:')
 
         if not group.within_constraints():
             log('\t not in time range')
@@ -77,17 +85,17 @@ def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
             if state == BlockedState.BLOCKED:
                 continue
 
-            entry = '0.0.0.0\t' + site + '\n'
+            entry = f'0.0.0.0\t{site}\n'
 
             # site is commented out -- uncomment
             if state == BlockedState.COMMENTED:
-                log('\t', entry[:-1], 'is commented on lines', lines)
+                log(f'\t{entry[:-1]} is commented on lines {lines}')
                 for l in lines:
                     newdata[l] = entry
                 continue
 
             # site is absent -- add
-            log('\t', entry[:-1], 'is missing')
+            log(f'\t {entry[:-1]} is missing')
             newdata.append(entry)
 
     if data == newdata:
