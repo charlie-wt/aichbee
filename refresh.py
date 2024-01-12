@@ -1,13 +1,8 @@
 from enum import Enum, auto
+import logging
 import re
 
 from blockgroup import BlockGroup
-
-
-verbose = False
-
-def log (*args, **kwargs):
-    if verbose: print(*args, **kwargs)
 
 
 class BlockedState(Enum):
@@ -71,10 +66,10 @@ def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
     if not isinstance(blocks, list): blocks = [blocks]
 
     for group in blocks:
-        log(f'group {group.display_name()}:')
+        logging.debug(f'group {group.display_name()}:')
 
         if not group.within_constraints():
-            log('\t not in time range')
+            logging.debug('\t not in time range')
             continue
 
         # this site should be blocked -- construct lines of new file
@@ -89,23 +84,23 @@ def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
 
             # site is commented out -- uncomment
             if state == BlockedState.COMMENTED:
-                log(f'\t{entry[:-1]} is commented on lines {lines}')
+                logging.debug(f'\t{entry[:-1]} is commented on lines {lines}')
                 for l in lines:
                     newdata[l] = entry
                 continue
 
             # site is absent -- add
-            log(f'\t {entry[:-1]} is missing')
+            logging.debug(f'\t {entry[:-1]} is missing')
             newdata.append(entry)
 
     if data == newdata:
         # file has not changed - don't bother writing
-        log('-- nothing\'s changed!')
+        logging.debug('-- nothing\'s changed!')
     else:
         # update the file
         with open(filename, 'w') as f:
             f.writelines(newdata)
-        log('-- blocked')
+        logging.debug('-- blocked')
 
 
 def unblock (filename: str, blocks: list[BlockGroup] | BlockGroup):
@@ -123,7 +118,7 @@ def unblock (filename: str, blocks: list[BlockGroup] | BlockGroup):
     if not isinstance(blocks, list): blocks = [blocks]
 
     for group in blocks:
-        log(f'unblocking group {group.display_name()}:')
+        logging.debug(f'unblocking group {group.display_name()}:')
 
         # construct lines of new file
         blockentries = [ '#0.0.0.0\t'+i+'\n' for i in group.sites ]
@@ -131,16 +126,15 @@ def unblock (filename: str, blocks: list[BlockGroup] | BlockGroup):
             if entry not in data:
                 if entry[1:] in data:
                     # comment the line
-                    if verbose:
-                        print('\t', entry[1:-1], 'is active at line',
-                              data.index(entry[1:]))
+                    logging.debug(f'\t{entry[1:-1]} is active at line '
+                                  f'{data.index(entry[1:])}')
                     newdata[data.index(entry[1:])] = entry
 
     if data == newdata:
         # file has not changed - don't bother writing
-        log('-- nothing\'s changed!')
+        logging.debug('-- nothing\'s changed!')
     else:
         # update the file
         with open(filename, 'w') as f:
             f.writelines(newdata)
-        log('-- unblocked')
+        logging.debug('-- unblocked')

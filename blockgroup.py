@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import logging
 
 from blocktime import Time, TimeRange, within_constraints
 
@@ -45,10 +46,9 @@ class BlockGroup:
                     bad_end = within_constraints(ranges[i].end, ranges[j])
 
                     if bad_start or bad_end:
-                        if verbose:
-                            print(f'constraints for group {self.display_name()}: ',
-                                  f'{ranges[i]} vs. {ranges[j]}: ',
-                                  f'bad start: {bad_start}, bad end: {bad_end}')
+                        logging.debug(f'constraints for group {self.display_name()}: ',
+                                      f'{ranges[i]} vs. {ranges[j]}: ',
+                                      f'bad start: {bad_start}, bad end: {bad_end}')
                         return False
             return True
 
