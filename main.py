@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from contextlib import contextmanager
 from datetime import datetime as dt
 from inotify_simple import INotify, flags
 import logging
@@ -43,18 +44,14 @@ def main ():
     # file to watch
     args.watchfile = os.path.abspath(args.watchfile)
     logging.debug(f'watching {args.watchfile}')
-    watchfile_dir, watchfile_file = os.path.split(args.watchfile)
+    watchfile_dir, watchfile_name = os.path.split(args.watchfile)
 
     # location of blocklist file
     logging.debug(f'getting blocklist from {args.blocklist}')
     blocks = bf.read(args.blocklist)
     for b in blocks: logging.debug(b)
 
-    # configure inotify
-    inotify = INotify()
-    watch_flags = flags.MODIFY
-    wd = inotify.add_watch(watchfile_dir, watch_flags)
-
+    # do an initial refresh
     prevtime = Time.now()
     # TODO #performance: not particularly efficient
     for group in blocks:
@@ -63,23 +60,41 @@ def main ():
         else:
             rf.unblock(args.watchfile, group)
 
+    # configure inotify
+    inotify = INotify()
+    wd = inotify.add_watch(watchfile_dir, flags.MODIFY)
+    @contextmanager
+    def suspend_watch():
+        nonlocal wd
+        try:
+            inotify.rm_watch(wd)
+            yield None
+        finally:
+            wd = inotify.add_watch(watchfile_dir, flags.MODIFY)
+
     # read events, maybe respond
     while True:
+        print('=== checking whether to refresh watched file ==========================')
+
         # check for the start of a group's time constrains
         now = Time.now()
         for group in blocks:
             if not group.within_constraints(prevtime) and group.within_constraints(now):
                 logging.debug(f'time start for group {group.display_name()}')
-                rf.block(args.watchfile, group)
+                with suspend_watch():
+                    rf.block(args.watchfile, group)
             if group.within_constraints(prevtime) and not group.within_constraints(now):
                 logging.debug(f'time end for group {group.display_name()}')
-                rf.unblock(args.watchfile, group)
+                with suspend_watch():
+                    rf.unblock(args.watchfile, group)
 
         prevtime = now
         # check for file modification events
         for event in inotify.read(timeout=timeout_ms):
-            if event[3] == watchfile_file:
-                rf.block(args.watchfile, blocks)
+            if event.name == watchfile_name and group.within_constraints(now):
+                logging.debug("watched file was edited!")
+                with suspend_watch():
+                    rf.block(args.watchfile, blocks)
 
 if __name__ == '__main__':
     main()

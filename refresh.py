@@ -95,12 +95,12 @@ def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
 
     if data == newdata:
         # file has not changed - don't bother writing
-        logging.debug('-- nothing\'s changed!')
+        logging.debug('-- nothing to update; don\'t write watched file')
     else:
         # update the file
         with open(filename, 'w') as f:
             f.writelines(newdata)
-        logging.debug('-- blocked')
+        logging.debug('-- written updated watched file')
 
 
 def unblock (filename: str, blocks: list[BlockGroup] | BlockGroup):
