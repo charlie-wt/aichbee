@@ -3,14 +3,12 @@
 # TODO #cleanup
 
 
-# install required python modules
-if command -v pip3 > /dev/null; then
-  if ! sudo -H pip3 show inotify_simple > /dev/null; then
+# install required python deps
+command -v python3 > /dev/null || sudo apt install python3
+command -v pip3 > /dev/null || sudo apt install python3-pip
+
+if ! sudo -H pip3 show inotify_simple > /dev/null 2>&1; then
     sudo -H pip3 install inotify_simple --break-system-packages
-  fi
-else
-  sudo apt install python3-pip &&
-  sudo -H pip3 install inotify_simple --break-system-packages
 fi
 
 required_python_minor=10
