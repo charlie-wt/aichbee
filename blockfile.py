@@ -8,9 +8,9 @@ import parse
 
 def get_filename () -> str:
     '''
-    try to get the blockfile from a standard location; /etc/hb/blocklist if running as
-    root, otherwise tries to use $XDG_CONFIG_HOME (in normal usage should be running as
-    root, since we're modifying /etc/hosts).
+    try to get the blockfile from a standard location; /etc/aichbee/blocklist if running
+    as root, otherwise tries to use $XDG_CONFIG_HOME (in normal usage should be running
+    as root, since we're modifying /etc/hosts).
 
     ... not the neatest thing.
 
@@ -26,10 +26,10 @@ def get_filename () -> str:
         if var is not None and (os.path.isdir(var)):
             prefix = var
 
-    return os.path.join(prefix, 'hb', 'blocklist')
+    return os.path.join(prefix, 'aichbee', 'blocklist')
 
 
-def read (filename: str = None) -> list[BlockGroup]:
+def read (filename: str | None = None) -> list[BlockGroup]:
     ''' read a list of domains to block (like 'blocklist'), from a file. '''
 
     if filename is None:

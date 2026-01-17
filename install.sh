@@ -20,7 +20,7 @@ if [ "$python_minor" -lt "$required_python_minor" ]; then
 fi
 
 # install and enable the systemd service (for run-on-startup)
-sudo cp i-am-making-a-bad-decision.service /etc/systemd/system/ &&
+sudo cp aichbee.service /etc/systemd/system/ &&
 sudo systemctl daemon-reload &&
-sudo systemctl enable i-am-making-a-bad-decision.service &&
-sudo systemctl start i-am-making-a-bad-decision.service
+sudo systemctl enable aichbee.service &&
+sudo systemctl start aichbee.service

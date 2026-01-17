@@ -19,7 +19,7 @@ class BlockGroup:
         return self.name or '(unnamed group)'
 
 
-    def within_constraints (self, now: Time = None) -> bool:
+    def within_constraints (self, now: Time | None = None) -> bool:
         ''' if the current time is `now`, should this group's blocks be applied? '''
         return within_constraints(now, self.ranges)
 

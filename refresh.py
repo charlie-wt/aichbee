@@ -90,7 +90,7 @@ def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
                 continue
 
             # site is absent -- add
-            logging.debug(f'\t {entry[:-1]} is missing')
+            logging.debug(f'\t{entry[:-1]} is missing')
             newdata.append(entry)
 
     if data == newdata:
@@ -121,7 +121,7 @@ def unblock (filename: str, blocks: list[BlockGroup] | BlockGroup):
         logging.debug(f'unblocking group {group.display_name()}:')
 
         # construct lines of new file
-        blockentries = [ '#0.0.0.0\t'+i+'\n' for i in group.sites ]
+        blockentries = [ f'#0.0.0.0\t{i}\n' for i in group.sites ]
         for entry in blockentries:
             if entry not in data:
                 if entry[1:] in data:
