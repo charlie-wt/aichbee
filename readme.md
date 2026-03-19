@@ -11,9 +11,11 @@ a website blocker.
 ## todo
 
 ### definitely
+
 * make the install location-independent
 
 ### maybe
+
 * allow blocking of launching programs as well as websites.
 * graphical front-end.
 * support for different systems (non-systemd, macOS, windows)
