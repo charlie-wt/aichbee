@@ -1,4 +1,5 @@
 from enum import Enum, auto
+import functools
 import logging
 import re
 
@@ -12,16 +13,14 @@ class BlockedState(Enum):
     ABSENT = auto()
 
 
-WATCHFILE_REGEXES = {}
+@functools.cache
+def site_regex(site: str) -> re.Pattern:
+    return re.compile(r'\s*(?P<comment_char>#\s*)?0.0.0.0\s+' + site)
 
 
 def line_match(site: str, watchfile_line: str) -> BlockedState:
-    regex = WATCHFILE_REGEXES.get(site)
-    if regex is None:
-        regex = re.compile(r'\s*(#\s*)?0.0.0.0\s+' + site)
-        WATCHFILE_REGEXES[site] = regex
-    if m := regex.match(watchfile_line):
-        if m.group(1) is None:
+    if m := site_regex(site).match(watchfile_line):
+        if m.group('comment_char') is None:
             return BlockedState.BLOCKED
         return BlockedState.COMMENTED
     return BlockedState.ABSENT
@@ -52,18 +51,17 @@ def blocked_state (site: str, watchfile_lines: list[str]) -> (BlockedState, list
         return (BlockedState.BLOCKED, blocked_lines)
     elif commented_lines:
         return (BlockedState.COMMENTED, commented_lines)
-    else:
-        return (BlockedState.ABSENT, [])
+    return (BlockedState.ABSENT, [])
 
 
 def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
     ''' Main function to correct the hosts file. '''
+    if not isinstance(blocks, list): blocks = [blocks]
+
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
-
     newdata = data[:]
-    if not isinstance(blocks, list): blocks = [blocks]
 
     for group in blocks:
         logging.debug(f'group {group.display_name()}:')
@@ -109,13 +107,12 @@ def unblock (filename: str, blocks: list[BlockGroup] | BlockGroup):
     a schedule finishes.
 
     '''
+    if not isinstance(blocks, list): blocks = [blocks]
 
     # get the data from the file
     with open(filename, 'r') as f:
         data = f.readlines()
-
     newdata = data[:]
-    if not isinstance(blocks, list): blocks = [blocks]
 
     for group in blocks:
         logging.debug(f'unblocking group {group.display_name()}:')

@@ -30,7 +30,7 @@ def get_filename () -> str:
 
 
 def read (filename: str | None = None) -> list[BlockGroup]:
-    ''' read a list of domains to block (like 'blocklist'), from a file. '''
+    ''' read a list of domains to block (like `example-blocklist`) from a file. '''
 
     if filename is None:
         filename = get_filename()
@@ -42,21 +42,21 @@ def read (filename: str | None = None) -> list[BlockGroup]:
         data = f.readlines()
 
     # get just the blocked domains
-    current_group = None
-    in_group = False
+    current_group: BlockGroup | None = None
+    in_a_group = False
     for line in data:
         line = line.split('#', 1)[0].strip()
         if line == '': continue
 
         if line[0] == "=":
             # lines starting with '=' mark the start/end of block groups
-            if in_group:
-                in_group = False
+            if in_a_group:
+                in_a_group = False
             else:
-                in_group = True
+                in_a_group = True
                 blockgroups.append(BlockGroup(parse.parse_name(line)))
                 current_group = blockgroups[-1]
-        elif in_group:
+        elif in_a_group:
             if line[0] == '@':
                 parse.parse_constraint(line, current_group)
 

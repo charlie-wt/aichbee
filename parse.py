@@ -7,12 +7,12 @@ from blockgroup import BlockGroup
 from blocktime import Time, TimeRange, Weekday
 
 
-NAME_PAT = re.compile(r'\s*=\s*(.*)\s*')
+NAME_PAT = re.compile(r'\s*=\s*(?P<name>.*)\s*')
 
 
 def parse_name (line: str) -> str | None:
     if m := re.match(NAME_PAT, line):
-        return m.group(1)
+        return m.group('name')
     return None
 
 
