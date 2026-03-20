@@ -1,24 +1,32 @@
 from datetime import datetime as dt
 import os
+from pathlib import Path
 
 from blockgroup import BlockGroup
 import blocktime as bt
 import parse
 
 
-def get_filename () -> str:
+def get_filename (allow_nonroot_fallback: bool = False) -> str:
     '''
-    try to get the blockfile from a standard location; /etc/aichbee/blocklist if running
-    as root, otherwise tries to use $XDG_CONFIG_HOME (in normal usage should be running
-    as root, since we're modifying /etc/hosts).
+    try to get the blockfile from a standard location.
+
+    normally this will be /etc/aichbee/blockfile (in normal usage should be running as
+    root, since we're modifying /etc/hosts). however, in some circumstances can return
+    something under $XDG_CONFIG_HOME (see ``allow_nonroot_fallback``).
 
     ... not the neatest thing.
+
+    :param allow_nonroot_fallback: If True, and this function is being run by a non-root
+                                   user, return an alternative path under
+                                   $XDG_CONFIG_HOME; otherwise, will always return the
+                                   system location.
 
     '''
 
     prefix = os.path.abspath(os.path.join(os.path.sep, 'etc'))
 
-    if os.geteuid() != 0:
+    if allow_nonroot_fallback and os.geteuid() != 0:
         var = os.environ.get('HOME')
         if var is not None:
             prefix = os.path.join(var, '.config')
@@ -26,14 +34,14 @@ def get_filename () -> str:
         if var is not None and (os.path.isdir(var)):
             prefix = var
 
-    return os.path.join(prefix, 'aichbee', 'blocklist')
+    return os.path.join(prefix, 'aichbee', 'blockfile')
 
 
-def read (filename: str | None = None) -> list[BlockGroup]:
-    ''' read a list of domains to block (like `example-blocklist`) from a file. '''
+def read (filename: str | Path) -> list[BlockGroup]:
+    ''' read a list of domains to block (like `example-blockfile`) from a file. '''
 
-    if filename is None:
-        filename = get_filename()
+    if isinstance(filename, Path):
+        filename = str(filename.resolve())
 
     blockgroups = []
 

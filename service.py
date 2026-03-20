@@ -23,9 +23,9 @@ def parse_args ():
     parser.add_argument('-w', '--watchfile',
                         default=os.path.abspath(os.path.join(os.path.sep, 'etc', 'hosts')),
                         help='Path to file to watch & manage (eg. hosts).')
-    parser.add_argument('-b', '--blocklist',
+    parser.add_argument('-b', '--blockfile',
                         default=bf.get_filename(),
-                        help='Path to blocklist to enforce.')
+                        help='Path to blockfile to enforce.')
     parser.add_argument('-v', '--verbose',
                         action='store_true',
                         help='Whether to log some extra messages to stdout.')
@@ -46,9 +46,9 @@ def main ():
     logging.debug(f'watching {args.watchfile}')
     watchfile_dir, watchfile_name = os.path.split(args.watchfile)
 
-    # location of blocklist file
-    logging.debug(f'getting blocklist from {args.blocklist}')
-    blocks = bf.read(args.blocklist)
+    # location of blockfile
+    logging.debug(f'getting blockfile from {args.blockfile}')
+    blocks = bf.read(args.blockfile)
     for b in blocks: logging.debug(b)
 
     # do an initial refresh

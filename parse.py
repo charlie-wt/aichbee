@@ -58,7 +58,7 @@ def parse_constraint (line: str, group: BlockGroup) -> None:
         if m := re.match(h.regex, line):
             h.handler(m, group)
             return
-    raise ValueError(f"Couldn't parse blocklist line: '{line}'")
+    raise ValueError(f"Couldn't parse blockfile line: '{line}'")
 
 
 def day (string: str) -> Weekday:
