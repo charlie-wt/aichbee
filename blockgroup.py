@@ -30,7 +30,8 @@ class Duration:
     length_hours: float
 
     def __str__(self) -> str:
-        return f"{self.length_hours} hours per {self.period.name.lower()}"
+        maybe_plural = "s" if self.length_hours != 1 else ""
+        return f"{self.length_hours} hour{maybe_plural} per {self.period.name.lower()}"
 
 
 @dataclass

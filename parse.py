@@ -53,8 +53,8 @@ SCHEDULE_HANDLERS = [
 
 
 def parse_schedule_constraint (line: str, group: BlockGroup) -> None:
-    ''' add the parsed schedule-constraint line `line` to BlockGroup `group`, or raise a
-    ValueError.
+    ''' Add the parsed schedule-constraint line ``line`` to BlockGroup ``group``, or
+    raise a ``ValueError``.
     '''
     for h in SCHEDULE_HANDLERS:
         if m := re.match(h.regex, line):
@@ -68,6 +68,9 @@ DURATION_PAT = re.compile(r'<(?P<length>\d+)hr\s+per\s+(?P<period>\w+)')
 
 
 def parse_duration_constraint (line: str, group: BlockGroup) -> None:
+    ''' Add the parsed duration-constraint line ``line`` to BlockGroup ``group``, or
+    raise a ``ValueError``.
+    '''
     if group.duration is not None:
         raise ValueError("Can only have one duration-based constraint per block "
                          "group, but tried to parse multiple on "
