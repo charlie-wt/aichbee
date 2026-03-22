@@ -36,3 +36,6 @@ sudo cp "$service_filename" /etc/systemd/system/ &&
 sudo systemctl daemon-reload &&
 sudo systemctl enable "$service_filename" &&
 sudo systemctl start "$service_filename"
+
+echo -e "\e[36mINSTALLED\e[0m"
+echo -e " * \e[33mNOTE\e[0m: if you move this folder, you'll have to run the script again."
