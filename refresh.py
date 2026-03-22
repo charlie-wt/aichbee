@@ -66,7 +66,7 @@ def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
     for group in blocks:
         logging.debug(f'group {group.display_name()}:')
 
-        if not group.within_constraints():
+        if not group.is_blocking():
             logging.debug('\t not in time range')
             continue
 

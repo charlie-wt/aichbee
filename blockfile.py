@@ -5,9 +5,10 @@ from pathlib import Path
 from blockgroup import BlockGroup
 import blocktime as bt
 import parse
+import util
 
 
-def get_filename (allow_nonroot_fallback: bool = False) -> str:
+def get_filename (allow_nonroot_fallback: bool = False) -> Path:
     '''
     try to get the blockfile from a standard location.
 
@@ -24,17 +25,12 @@ def get_filename (allow_nonroot_fallback: bool = False) -> str:
 
     '''
 
-    prefix = os.path.abspath(os.path.join(os.path.sep, 'etc'))
+    path = Path('/etc/aichbee')
 
     if allow_nonroot_fallback and os.geteuid() != 0:
-        var = os.environ.get('HOME')
-        if var is not None:
-            prefix = os.path.join(var, '.config')
-        var = os.environ.get('XDG_CONFIG_HOME')
-        if var is not None and (os.path.isdir(var)):
-            prefix = var
+        path = util.config_dir()
 
-    return os.path.join(prefix, 'aichbee', 'blockfile')
+    return path / 'blockfile'
 
 
 def read (filename: str | Path) -> list[BlockGroup]:
@@ -62,13 +58,14 @@ def read (filename: str | Path) -> list[BlockGroup]:
                 in_a_group = False
             else:
                 in_a_group = True
-                blockgroups.append(BlockGroup(parse.parse_name(line)))
+                blockgroups.append(BlockGroup(parse.parse_name(line),
+                                              config_filename=filename))
                 current_group = blockgroups[-1]
         elif in_a_group:
             if line[0] == '@':
                 parse.parse_schedule_constraint(line, current_group)
 
-                if not current_group.constraints_consistent():
+                if not current_group.schedule_constraints_consistent():
                     raise ValueError(f'time constraints on block group '
                                      f'{n.display_name()} overlap, and so are not '
                                      'consistent.')

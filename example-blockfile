@@ -39,6 +39,11 @@ twitch.tv
 # constraint on a group.
 #
 # Duration-based blocks are activated and deactivated via the CLI.
+#
+# note that the reset periods mean slightly different things:
+# * 'day' means every 24 hours.
+# * 'week' means every 24 hours, times 7.
+# * 'month' means when the calendar month has changed.
 <1hr per week
 
 zombo.com

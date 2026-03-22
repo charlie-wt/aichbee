@@ -16,11 +16,11 @@ class Weekday(Enum):
     SATURDAY  = auto()
     SUNDAY    = auto()
 
-    def now () -> 'Weekday':
-        return Weekday(dt.today().weekday())
+    def from_dt (dtime: dt) -> 'Weekday':
+        return Weekday(dtime.weekday())
 
-    def __lt__ (self, other: 'Weekday') -> bool:
-        return self.value < other.value
+    def now () -> 'Weekday':
+        return Weekday.from_dt(dt.today())
 
     def from_str (string: str) -> 'Weekday':
         ''' Parse ``string`` into a ``Weekday`` (based on it being the prefix of a
@@ -28,6 +28,9 @@ class Weekday(Enum):
         '''
         return util.get_unique_enum_prefix_match(
             string, Weekday, value_name="weekday")
+
+    def __lt__ (self, other: 'Weekday') -> bool:
+        return self.value < other.value
 
 
 @dataclass
@@ -39,10 +42,14 @@ class Time:
         return f'{self.day.name.title()[:3] + " @ " if self.day else ""}' \
                f'{self.time.strftime("%H:%M")}'
 
+    def from_dt (dtime: dt) -> 'Time':
+        return Time(dt.time(dtime), Weekday.from_dt(dtime))
+
     def now () -> 'Time':
-        return Time(dt.time(dt.now()), Weekday.now())
+        return Time.from_dt(dt.now())
 
     def from_str (time_str: str, day: Weekday | None = None) -> 'Time':
+        ''' Expects a string of the format hh:mm '''
         return Time(time=dt.strptime(time_str, '%H:%M').time(), day=day)
 
 

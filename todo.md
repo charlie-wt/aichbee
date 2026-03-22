@@ -6,7 +6,7 @@
               the blockfile.
         * [ ] only require `sudo` for those operations that need it (basically
               just `pause`?)
-    * [ ] new syntax to allow specifying that a group can be unblocked for
+    * [~] new syntax to allow specifying that a group can be unblocked for
           a certain period—eg. "i can only access these sites for 1hr per
           {day,week,month...}".
         * [ ] also allow setting an unlimited duration, for if people just want

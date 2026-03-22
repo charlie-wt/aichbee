@@ -76,6 +76,11 @@ def parse_duration_constraint (line: str, group: BlockGroup) -> None:
                          "group, but tried to parse multiple on "
                          f"{group.display_name()}.")
 
+    if group.name is None:
+        raise ValueError("Tried to parse a duration in an unnamed block group. Any "
+                         "block group with a duration-based constraint (and thus "
+                         "needing to save state) must have a unique name.")
+
     m = re.match(DURATION_PAT, line)
     if m is None:
         raise ValueError(f"Block group {group.display_name()}: couldn't parse "

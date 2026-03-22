@@ -1,4 +1,6 @@
+from pathlib import Path
 from enum import Enum
+import os
 
 
 def get_unique_prefix_match(prefix: str,
@@ -52,3 +54,26 @@ def get_unique_enum_prefix_match(prefix: str,
                                             case_sensitive=case_sensitive,
                                             category_name=value_name)
     return enum._member_map_[res_name.upper()]
+
+
+xdg_base_dirs = {
+    "XDG_CONFIG_HOME": [".config"],
+    "XDG_STATE_HOME": [".local", "share"],
+}
+
+def xdg_base_dir (dirname: str) -> Path:
+    env_var = f"XDG_{dirname.upper()}_HOME"
+
+    value = os.environ.get(env_var)
+    if value is not None and value != "":
+        return Path(value)
+
+    return Path.home().joinpath(*xdg_base_dirs[env_var])
+
+
+def state_dir () -> Path:
+    return xdg_base_dir("state") / "aichbee"
+
+
+def config_dir () -> Path:
+    return xdg_base_dir("config") / "aichbee"

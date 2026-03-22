@@ -24,7 +24,7 @@ def parse_args ():
                         default=os.path.abspath(os.path.join(os.path.sep, 'etc', 'hosts')),
                         help='Path to file to watch & manage (eg. hosts).')
     parser.add_argument('-b', '--blockfile',
-                        default=bf.get_filename(),
+                        default=str(bf.get_filename()),
                         help='Path to blockfile to enforce.')
     parser.add_argument('-v', '--verbose',
                         action='store_true',
@@ -51,11 +51,15 @@ def main ():
     blocks = bf.read(args.blockfile)
     for b in blocks: logging.debug(b)
 
+    for b in blocks:
+        if b.duration is not None:
+            b.load_state()
+
     # do an initial refresh
-    prevtime = Time.now()
+    prevtime = dt.now()
     # TODO #performance: not particularly efficient
     for group in blocks:
-        if group.within_constraints():
+        if group.is_blocking():
             rf.block(args.watchfile, group)
         else:
             rf.unblock(args.watchfile, group)
@@ -72,18 +76,24 @@ def main ():
         finally:
             wd = inotify.add_watch(watchfile_dir, flags.MODIFY)
 
+    # TODO #temp
+    for b in blocks:
+        if b.duration is not None:
+            b.update_state(prevtime)
+
+    # TODO #finish: update state on those block groups that need it.
     # read events, maybe respond
     while True:
         print('=== checking whether to refresh watched file ==========================')
 
         # check for the start of a group's time constrains
-        now = Time.now()
+        now = dt.now()
         for group in blocks:
-            if not group.within_constraints(prevtime) and group.within_constraints(now):
+            if not group.is_blocking(prevtime) and group.is_blocking(now):
                 logging.debug(f'time start for group {group.display_name()}')
                 with suspend_watch():
                     rf.block(args.watchfile, group)
-            if group.within_constraints(prevtime) and not group.within_constraints(now):
+            if group.is_blocking(prevtime) and not group.is_blocking(now):
                 logging.debug(f'time end for group {group.display_name()}')
                 with suspend_watch():
                     rf.unblock(args.watchfile, group)
@@ -91,7 +101,7 @@ def main ():
         prevtime = now
         # check for file modification events
         for event in inotify.read(timeout=timeout_ms):
-            if event.name == watchfile_name and group.within_constraints(now):
+            if event.name == watchfile_name and group.is_blocking(now):
                 logging.debug("watched file was edited!")
                 with suspend_watch():
                     rf.block(args.watchfile, blocks)

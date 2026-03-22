@@ -20,7 +20,7 @@ def groups (bf_path: Path | None = None) -> list[BlockGroup]:
     :param bf_path: Location of blockfile (else pick a standard default).
     """
     if bf_path is None:
-        bf_path = Path(blockfile.get_filename())
+        bf_path = blockfile.get_filename()
     return blockfile.read(str(bf_path.resolve()))
 
 
@@ -31,7 +31,7 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
     """
     ret = group.name
     if should_colour:
-        if not group.within_constraints():
+        if not group.is_blocking():
             ret = colour.grey(ret)
     # TODO #enhancement: colouring for 'schedule-based constraint would be open, but
     # group is paused.'
@@ -51,9 +51,9 @@ def ls (blocked_filter: bool | None = None,
     """
     names: list[str] = []
     for g in groups(bf_path=bf_path):
-        if blocked_filter == True and g.within_constraints():
+        if blocked_filter == True and g.is_blocking():
             print(maybe_coloured_group_name(g, should_colour))
-        elif blocked_filter == False and not g.within_constraints():
+        elif blocked_filter == False and not g.is_blocking():
             print(maybe_coloured_group_name(g, should_colour))
         elif blocked_filter is None:
             print(maybe_coloured_group_name(g, should_colour))
