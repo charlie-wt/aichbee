@@ -64,7 +64,7 @@ def parse_schedule_constraint (line: str, group: BlockGroup) -> None:
                      f"line: '{line}'")
 
 
-DURATION_PAT = re.compile(r'<(?P<length>\d+)hr\s+per\s+(?P<period>\w+)')
+DURATION_PAT = re.compile(r'<(?P<length>\d+)hrs?\s+per\s+(?P<period>\w+)')
 
 
 def parse_duration_constraint (line: str, group: BlockGroup) -> None:

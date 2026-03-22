@@ -52,7 +52,7 @@ zombo.com
 # At the point the schedule constraints open up, a group that also has a duration-based
 # constraint won't automatically become unblocked: it needs to be specifically unblocked
 # via the CLI.
-<1hr per day
+<2hrs per day
 @ 00:00 - 17:00
 
 tumblr.com
