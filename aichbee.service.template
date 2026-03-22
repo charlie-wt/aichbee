@@ -6,10 +6,8 @@ Type=simple
 Restart=always
 RestartSec=10
 TimeoutSec=2
-# TODO #enhancement: have this file be a template, then on install sub in the real
-# source directory
-WorkingDirectory=/home/charlie/src/aichbee
-ExecStart=/home/charlie/src/aichbee/service.py
+WorkingDirectory=<<SRC_LOC>>
+ExecStart=<<SRC_LOC>>/service.py
 User=root
 [Install]
 WantedBy=multi-user.target

@@ -12,8 +12,6 @@ a website blocker.
 
 ### definitely
 
-* make the install location-independent
-
 ### maybe
 
 * allow blocking of launching programs as well as websites.
