@@ -66,12 +66,14 @@ def read (filename: str | Path) -> list[BlockGroup]:
                 current_group = blockgroups[-1]
         elif in_a_group:
             if line[0] == '@':
-                parse.parse_constraint(line, current_group)
+                parse.parse_schedule_constraint(line, current_group)
 
                 if not current_group.constraints_consistent():
                     raise ValueError(f'time constraints on block group '
                                      f'{n.display_name()} overlap, and so are not '
                                      'consistent.')
+            elif line[0] == '<':
+                parse.parse_duration_constraint(line, current_group)
             else:
                 current_group.sites.append(line)
 

@@ -33,6 +33,8 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
     if should_colour:
         if not group.within_constraints():
             ret = colour.grey(ret)
+    # TODO #enhancement: colouring for 'schedule-based constraint would be open, but
+    # group is paused.'
     return ret
 
 

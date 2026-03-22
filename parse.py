@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime as dt
 import re
 
-from blockgroup import BlockGroup
+from blockgroup import BlockGroup, Duration, DurationPeriod
 from blocktime import Time, TimeRange, Weekday
 
 
@@ -20,14 +20,16 @@ def parse_time_constraint (m: re.Match, group: BlockGroup):
     start = Time.from_str(time_str=m.group('start_time'))
     end = Time.from_str(time_str=m.group('end_time'))
 
-    group.ranges.append(TimeRange(start, end))
+    group.schedule_ranges.append(TimeRange(start, end))
 
 
 def parse_day_constraint (m: re.Match, group: BlockGroup):
-    start = Time.from_str(time_str=m.group('start_time'), day=day(m.group('start_day')))
-    end = Time.from_str(time_str=m.group('end_time'), day=day(m.group('end_day')))
+    start = Time.from_str(time_str=m.group('start_time'),
+                          day=Weekday.from_str(m.group('start_day')))
+    end = Time.from_str(time_str=m.group('end_time'),
+                        day=Weekday.from_str(m.group('end_day')))
 
-    group.ranges.append(TimeRange(start, end))
+    group.schedule_ranges.append(TimeRange(start, end))
 
 
 @dataclass
@@ -36,7 +38,7 @@ class LineType:
     handler: Callable[[re.Match, BlockGroup], None]
 
 
-HANDLERS = [
+SCHEDULE_HANDLERS = [
     LineType(re.compile(r'\s*@\s*'
                         r'(?P<start_time>\d\d:\d\d)\s*-\s*'
                         r'(?P<end_time>\d\d:\d\d)\s*'),
@@ -50,24 +52,31 @@ HANDLERS = [
 ]
 
 
-def parse_constraint (line: str, group: BlockGroup) -> None:
-    ''' add the parsed constraint line `line` to BlockGroup `group`, or raise a
+def parse_schedule_constraint (line: str, group: BlockGroup) -> None:
+    ''' add the parsed schedule-constraint line `line` to BlockGroup `group`, or raise a
     ValueError.
     '''
-    for h in HANDLERS:
+    for h in SCHEDULE_HANDLERS:
         if m := re.match(h.regex, line):
             h.handler(m, group)
             return
-    raise ValueError(f"Couldn't parse blockfile line: '{line}'")
+    raise ValueError(f"Block group {group.display_name()}: couldn't parse blockfile "
+                     f"line: '{line}'")
 
 
-def day (string: str) -> Weekday:
-    ''' parse `string` into a Weekday (based on it being the prefix of a weekday), or
-    raise a ValueError.
-    '''
-    s = string.lower()
-    for d in Weekday:
-        if d.name.lower().startswith(s):
-            return d
+DURATION_PAT = re.compile(r'<(?P<length>\d+)hr\s+per\s+(?P<period>\w+)')
 
-    raise ValueError(f"Couldn't parse weekday '{string}'")
+
+def parse_duration_constraint (line: str, group: BlockGroup) -> None:
+    if group.duration is not None:
+        raise ValueError("Can only have one duration-based constraint per block "
+                         "group, but tried to parse multiple on "
+                         f"{group.display_name()}.")
+
+    m = re.match(DURATION_PAT, line)
+    if m is None:
+        raise ValueError(f"Block group {group.display_name()}: couldn't parse "
+                         f"blockfile line: '{line}'")
+
+    group.duration = Duration(DurationPeriod.from_str(m.group("period")),
+                              float(m.group("length")))

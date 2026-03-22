@@ -1,10 +1,10 @@
-# Blocks are organised into block-groups.
-# To start a group, start a line with "=", optionally followed by a name.
-# To end a group, simply have a line with only a "=".
+# Blocks are organised into 'block groups'.
+# To start a group, start a line with `=`, optionally followed by a name.
+# To end a group, simply have a line with only a `=`.
 
 = my daily blocks
-# Constrain your blocks in time by starting a line with "@". This constraint will block
-# the group from 12:00 until 13:00, every day.
+# Constrain your blocks on a schedule by starting a line with `@`. This constraint will
+# block the group from 12:00 until 13:00, every day.
 @ 12:00 - 13:00
 # You can have multiple constraints, but they can't overlap.
 #
@@ -20,7 +20,7 @@ twitter.com
 
 
 = my weekly blocks
-# You can make weekday-based constraints too, via the first three letters of the day.
+# You can make weekday-based constraints too, via (some unique prefix of) their names.
 # Like the time-only constraints, these shouldn't overlap.
 @ mon 00:00 - fri 23:59
 @ sat 20:00 - sat 23:59
@@ -34,7 +34,26 @@ twitch.tv
 
 
 = durational blocks
+# You can specify that a group can be unblocked for a certain duration per
+# day/week/month by starting the line with a `<`. You can only have one duration-based
+# constraint on a group.
+#
+# Duration-based blocks are activated and deactivated via the CLI.
 <1hr per week
 
 zombo.com
+=
+
+
+= combo blocks
+# You can have a duration-based *and* schedule-based constraint on the same group. In
+# this case, the group can only be deactivated when the schedule would be open.
+#
+# At the point the schedule constraints open up, a group that also has a duration-based
+# constraint won't automatically become unblocked: it needs to be specifically unblocked
+# via the CLI.
+<1hr per day
+@ 00:00 - 17:00
+
+tumblr.com
 =

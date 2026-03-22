@@ -3,6 +3,8 @@ from datetime import datetime as dt
 from enum import Enum, auto
 from functools import total_ordering
 
+import util
+
 
 @total_ordering
 class Weekday(Enum):
@@ -19,6 +21,13 @@ class Weekday(Enum):
 
     def __lt__ (self, other: 'Weekday') -> bool:
         return self.value < other.value
+
+    def from_str (string: str) -> 'Weekday':
+        ''' Parse ``string`` into a ``Weekday`` (based on it being the prefix of a
+        weekday), or raise a ``ValueError`` if it can't be done.
+        '''
+        return util.get_unique_enum_prefix_match(
+            string, Weekday, value_name="weekday")
 
 
 @dataclass

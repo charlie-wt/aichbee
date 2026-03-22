@@ -1,32 +1,60 @@
 from dataclasses import dataclass, field
+from enum import Enum, auto
 import logging
 
 from blocktime import Time, TimeRange, within_constraints
+import util
+
+
+class DurationPeriod(Enum):
+    ''' The period over which a duration-based constraint can apply before resetting.
+    '''
+
+    DAY   = auto()
+    WEEK  = auto()
+    MONTH = auto()
+
+    def from_str (string: str) -> 'DurationPeriod':
+        ''' Parse ``string`` into a ``DurationPeriod`` (based on it being the prefix of
+        a period), or raise a ``ValueError`` if it can't be done.
+        '''
+        return util.get_unique_enum_prefix_match(
+            string, DurationPeriod, value_name="duration period")
+
+
+@dataclass
+class Duration:
+    ''' A duration-based constraint. '''
+
+    period: DurationPeriod
+    length_hours: float
+
+    def __str__(self) -> str:
+        return f"{self.length_hours} hours per {self.period.name.lower()}"
 
 
 @dataclass
 class BlockGroup:
-    ''' a group of sites to block, with the time constraints with which to block them.
-
-    '''
+    ''' A group of sites to block, with the constraints with which to block them. '''
 
     name: str | None
     sites: list[str] = field(default_factory=list)
-    ranges: list[TimeRange] = field(default_factory=list)
-
+    schedule_ranges: list[TimeRange] = field(default_factory=list)
+    duration: Duration | None = None
 
     def display_name (self) -> str:
         return self.name or '(unnamed group)'
 
 
     def within_constraints (self, now: Time | None = None) -> bool:
-        ''' if the current time is `now`, should this group's blocks be applied? '''
-        return within_constraints(now, self.ranges)
+        ''' If the current time is `now`, should this group's blocks be applied? '''
+        return within_constraints(now, self.schedule_ranges)
 
 
     def constraints_consistent (self) -> bool:
         '''
-        Are the constraints on the given block group consistent with each other?
+        Are the (schedule-based) constraints on the given block group consistent with
+        each other?
 
         Currently, returns `False` if any of the time-only constraints (eg. "@ 01:00 -
         02:00") *or* any of the day-based constraints (eg. "@ mon 03:00 - fri 04:00")
@@ -55,7 +83,7 @@ class BlockGroup:
         # check time-based, and day-based ranges against each other separately
         time_only_ranges = []
         day_based_ranges = []
-        for r in self.ranges:
+        for r in self.schedule_ranges:
             if r.time_only():
                 time_only_ranges.append(r)
             else:
@@ -68,9 +96,15 @@ class BlockGroup:
     def __str__ (self) -> str:
         res = f'Group "{self.display_name()}":\n'
 
-        res += '\tTime constraints:\n'
-        for r in self.ranges:
+        res += '\tSchedule constraints:\n'
+        for r in self.schedule_ranges:
             res += f'\t\t{r}\n'
+
+        res += '\tDuration constraint:\n'
+        if self.duration is None:
+            res += "\t\t(none)\n"
+        else:
+            res += f'\t\t{self.duration}\n'
 
         res += '\tSites to block:\n'
         for s in self.sites:
