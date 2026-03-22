@@ -2,6 +2,8 @@
 
 a website blocker.
 
+for an example of the config file syntax, see [example-blocklist](example-blocklist).
+
 ## dependencies
 
 * python 3
@@ -11,6 +13,10 @@ a website blocker.
 ## todo
 
 ### definitely
+
+* on [durational](https://github.com/charlie-wt/aichbee/tree/durational) branch:
+    * cli (inspecting, pausing groups)
+    * duration-based constraints
 
 ### maybe
 
