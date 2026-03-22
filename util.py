@@ -58,7 +58,7 @@ def get_unique_enum_prefix_match(prefix: str,
 
 xdg_base_dirs = {
     "XDG_CONFIG_HOME": [".config"],
-    "XDG_STATE_HOME": [".local", "share"],
+    "XDG_STATE_HOME": [".local", "state"],
 }
 
 def xdg_base_dir (dirname: str) -> Path:

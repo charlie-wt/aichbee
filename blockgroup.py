@@ -98,7 +98,8 @@ class BlockGroup:
                              "Any block group with a duration-based constraint (and "
                              "thus needing to save state) must have a unique name.")
 
-        filename: str = base64.b64encode(bytes(self.config_filename + self.name, 'utf-8')).decode('utf-8')
+        canonical_name: str = self.config_filename + self.name
+        filename: str = base64.b64encode(bytes(canonical_name, 'utf-8')).decode('utf-8')
 
         # TODO #correctness: should this be `state_dir`; it's likely gonna be made by (&
         # thus owned by) root; feels like it should then be put somewhere more root-y?
