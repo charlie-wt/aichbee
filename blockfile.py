@@ -33,8 +33,13 @@ def get_filename (allow_nonroot_fallback: bool = False) -> Path:
     return path / 'blockfile'
 
 
-def read (filename: str | Path) -> list[BlockGroup]:
-    ''' read a list of domains to block (like `example-blockfile`) from a file. '''
+def read (filename: str | Path, load_state: bool = True) -> list[BlockGroup]:
+    ''' read a list of domains to block (like `example-blockfile`) from a file.
+
+    :param filename: Path to read from.
+    :param load_state: Whether to also try to load the state file for this group, to
+                       maintain things like remaining durations.
+    '''
 
     if isinstance(filename, Path):
         filename = str(filename.resolve())
@@ -79,6 +84,10 @@ def read (filename: str | Path) -> list[BlockGroup]:
         orig = group.sites[:]
         group.sites += [ 'www.'+i for i in orig if not i.startswith('www.') ]
         group.sites += [ i[4:] for i in orig if i.startswith('www.') ]
+
+    if load_state:
+        for group in blockgroups:
+            group.load_state()
 
     # return results
     return blockgroups

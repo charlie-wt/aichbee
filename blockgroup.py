@@ -142,17 +142,27 @@ class BlockGroup:
         if self.state.is_paused or self.within_schedule_constraints(now):
             return
 
-        if (self.state.prev_duration_reset is None or
-            self.state.duration_remaining is None or
-            self.duration.period.ready_to_reset(now, self.state.prev_duration_reset)
-           ):
+        if any(
+            self.state.prev_duration_reset is None,
+            self.state.duration_remaining is None,
+            self.state.prev_duration_remaining_update is None,
+            self.duration.period.ready_to_reset(now, self.state.prev_duration_reset),
+        ):
             self.state.reset_duration(now, self.duration)
 
         to_deduct: timedelta = now - self.state.prev_duration_remaining_update
         self.state.duration_remaining -= to_deduct
         self.state.prev_duration_remaining_update = now
 
-        self.state_path().parent.mkdir(mode=0o664, parents=True, exist_ok=True)
+        self.save_state()
+
+    def save_state (self) -> None:
+        ''' Save duration-constraint state to this group's standardised file.
+
+        Note: will raise a ``ValueError`` if this group has no name: any block group
+        that needs to save state must have a unique name.
+        '''
+        self.state_path().parent.mkdir(mode=0o775, parents=True, exist_ok=True)
         with open(self.state_path(), 'wb') as f:
             pickle.dump(self.state, f)
 
@@ -167,11 +177,15 @@ class BlockGroup:
         with open(self.state_path(), 'rb') as f:
             self.state = pickle.load(f)
 
-    def pause() -> None:
+    def pause (self) -> None:
+        self.update_state()
         self.state.is_paused = True
+        self.save_state()
 
-    def unpause() -> None:
+    def unpause (self) -> None:
         self.state.is_paused = False
+        self.save_state()
+        self.update_state()
 
     def within_schedule_constraints (self, now: dt) -> bool:
         ''' If the current time is `now`, do the group's schedule constraints say the

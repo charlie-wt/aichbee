@@ -51,10 +51,6 @@ def main ():
     blocks = bf.read(args.blockfile)
     for b in blocks: logging.debug(b)
 
-    for b in blocks:
-        if b.duration is not None:
-            b.load_state()
-
     # do an initial refresh
     prevtime = dt.now()
     # TODO #performance: not particularly efficient

@@ -2,6 +2,7 @@
 
 import argparse
 import functools
+import logging
 import os
 from pathlib import Path
 import sys
@@ -9,6 +10,7 @@ import sys
 import blockfile
 import colour
 from blockgroup import BlockGroup
+import util
 
 
 @functools.cache
@@ -33,6 +35,9 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
     if should_colour:
         if not group.is_blocking():
             ret = colour.grey(ret)
+        # TODO #temp
+        if group.state.is_paused:
+            ret = "* " + ret
     # TODO #enhancement: colouring for 'schedule-based constraint would be open, but
     # group is paused.'
     return ret
@@ -59,20 +64,37 @@ def ls (blocked_filter: bool | None = None,
             print(maybe_coloured_group_name(g, should_colour))
 
 
+# TODO #enhancement: either disallow duplicate group names earlier, or add an extra
+# interactive step to select a group based on a preview of its contents.
+def get_prefix_group_match (name_prefix: str, groups: list[BlockGroup]) -> BlockGroup:
+    """ Like ``utils.get_unique_prefix_match``, but for group names; return the matching
+    ``BlockGroup`` itself.
+    """
+    group_name = util.get_unique_prefix_match(name_prefix, [g.name for g in groups])
+    # Note: get_unique_prefix_match will handle ambiguous match
+    return next(g for g in groups if g.name == group_name)
+
+
+# TODO #correctness: return success of operation (ie. is the group now open?)?
+def set_paused (group_name: str, paused: bool, bf_path: Path | None = None) -> None:
+    """ Either pause or unpause a block group, if it's one with a duration-based block.
+    """
+    to_pause: BlockGroup = get_prefix_group_match(group_name, groups(bf_path=bf_path))
+    if paused:
+        to_pause.pause()
+    else:
+        to_pause.unpause()
+    logging.info(f'{"" if paused else "un"}paused {to_pause.display_name()}')
+
+
 def pause (group_name: str, bf_path: Path | None = None) -> None:
     """ Command: pause a block group, if it's one with a duration-based block. """
-    matching = [ g for g in groups(bf_path=bf_path) if g.name == group_name ]
-    if len(matching) < 1:
-        raise ValueError(f"Group name {group_name} doesn't match a known group!")
-    if len(matching) > 1:
-        # TODO #enhancement: either disallow duplicate group names earlier, or add an
-        # extra interactive step to select a group based on a preview of its contents.
-        raise ValueError(f"Group name {group_name} matches multiple groups!")
-    matching = matching[0]
+    return set_paused(group_name, True, bf_path)
 
-    print(matching)
-    # TODO #finish
-    raise NotImplementedError(f"pause({group_name})")
+
+def unpause (group_name: str, bf_path: Path | None = None) -> None:
+    """ Command: unpause a block group, if it's one with a duration-based block. """
+    return set_paused(group_name, False, bf_path)
 
 
 def main ():
@@ -93,6 +115,10 @@ def main ():
         help=("Should output be coloured? If not set, will choose based on whether "
               "terminal is interactive"),
     )
+    common_args_parser.add_argument('-v', '--verbose',
+                                    action='store_true',
+                                    help=('Whether to log some extra messages to '
+                                          'stdout.'))
 
     parser_list = subparsers.add_parser(
         "list",
@@ -116,7 +142,18 @@ def main ():
         "pause_block_group",
         help="Name of the block group to pause.")
 
+    parser_unpause = subparsers.add_parser(
+        "unpause",
+        parents=[common_args_parser],
+        help="Unpause the given block group, if allowed.")
+    parser_unpause.add_argument(
+        "unpause_block_group",
+        help="Name of the block group to unpause.")
+
     args: argparse.Namespace = parser.parse_args()
+
+    logging.basicConfig(format='%(message)s',
+                        level='NOTSET' if args.verbose else 'WARNING')
 
     if args.command is None:
         # if we weren't given a command, then `args` won't have properties for the
@@ -138,6 +175,8 @@ def main ():
     match args.command:
         case 'pause':
             pause(args.pause_block_group, bf_path)
+        case 'unpause':
+            unpause(args.unpause_block_group, bf_path)
         case 'list':
             blocked_filter: bool | None = None
             if args.blocked:
