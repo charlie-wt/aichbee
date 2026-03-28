@@ -66,6 +66,9 @@ class State:
     is_paused: bool = False
     prev_duration_reset: dt | None = None
     duration_remaining: timedelta | None = None
+    # TODO #verify: to actually make things robust to crashes, does this need to be part
+    # of some separate 'transient state', not this 'durable state' that gets saved to a
+    # file?
     prev_duration_remaining_update: dt | None = None
 
     def reset_duration(self, now: dt, duration: Duration) -> None:
@@ -198,14 +201,14 @@ class BlockGroup:
         '''
         Are this group's (schedule-based) constraints consistent with each other?
 
-        Currently, returns `False` if any of the time-only constraints (eg. "@ 01:00 -
+        Currently, returns ``False`` if any of the time-only constraints (eg. "@ 01:00 -
         02:00") *or* any of the day-based constraints (eg. "@ mon 03:00 - fri 04:00")
         overlap at all in time (they're checked independently).
 
         '''
 
         def ranges_consistent (ranges: list[TimeRange]) -> bool:
-            ''' is the given set of ranges consistent with itself? '''
+            ''' Is the given set of ranges consistent with itself? '''
 
             for i in range(len(ranges)):
                 for j in range(len(ranges)):

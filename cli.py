@@ -31,7 +31,7 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
     Get the name of the given ``group``, suitably coloured based on state &
     ``should_colour`` option.
     """
-    ret = group.name
+    ret = group.display_name()
     if should_colour:
         if not group.is_blocking():
             ret = colour.grey(ret)
@@ -75,11 +75,25 @@ def get_prefix_group_match (name_prefix: str, groups: list[BlockGroup]) -> Block
     return next(g for g in groups if g.name == group_name)
 
 
-# TODO #correctness: return success of operation (ie. is the group now open?)?
+# TODO #correctness: return whether the group is now open?
 def set_paused (group_name: str, paused: bool, bf_path: Path | None = None) -> None:
     """ Either pause or unpause a block group, if it's one with a duration-based block.
     """
     to_pause: BlockGroup = get_prefix_group_match(group_name, groups(bf_path=bf_path))
+    # TODO #robustness: communicating 'pausedness' via a file like this, which is also
+    # being written to periodically by the service (to update things like duration
+    # remaining), introduces a potential race condition.
+    #
+    # i don't think there's a way to have the pausedness persist across reboots without
+    # writing to a file like this (which also acts as a convenient method of ipc). it
+    # might not be too bad ux if we just re-pause anything pausable on shutdown, though.
+    # similarly, prob can't have updating-duration-across-reboots-correctly work simply
+    # without something regularly writing a `duration_remaining` value back to a file.
+    # that has to be the service, since it's the only thing running over time.
+    #
+    # could have separate files for pausedness & `duration_remaining`, since pausedness
+    # will only be written by cli & `duration_remaining` will only be written by the
+    # service.
     if paused:
         to_pause.pause()
     else:
@@ -185,6 +199,8 @@ def main ():
                 blocked_filter = False
 
             ls(blocked_filter, bf_path, should_colour)
+        case _:
+            raise NotImplementedError(f"Unhandled command {args.command}.")
 
 
 if __name__ == '__main__':
