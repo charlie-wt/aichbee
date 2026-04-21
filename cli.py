@@ -166,15 +166,15 @@ def main ():
 
     args: argparse.Namespace = parser.parse_args()
 
-    logging.basicConfig(format='%(message)s',
-                        level='NOTSET' if args.verbose else 'WARNING')
-
     if args.command is None:
         # if we weren't given a command, then `args` won't have properties for the
         # common arguments to the next parsing step will fail.
         print("Please provide a command, or -h/--help to print help.",
               file=sys.stderr)
         return
+
+    logging.basicConfig(format='%(message)s',
+                        level='NOTSET' if args.verbose else 'WARNING')
 
     # parse general args
     should_colour = args.colours

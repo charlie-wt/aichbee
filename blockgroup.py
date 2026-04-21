@@ -145,11 +145,11 @@ class BlockGroup:
         if self.state.is_paused or self.within_schedule_constraints(now):
             return
 
-        if any(
-            self.state.prev_duration_reset is None,
-            self.state.duration_remaining is None,
-            self.state.prev_duration_remaining_update is None,
-            self.duration.period.ready_to_reset(now, self.state.prev_duration_reset),
+        if (
+            self.state.prev_duration_reset is None or
+            self.state.duration_remaining is None or
+            self.state.prev_duration_remaining_update is None or
+            self.duration.period.ready_to_reset(self.state.prev_duration_reset, now)
         ):
             self.state.reset_duration(now, self.duration)
 
