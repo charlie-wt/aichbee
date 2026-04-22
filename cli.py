@@ -23,7 +23,7 @@ def groups (bf_path: Path | None = None) -> list[BlockGroup]:
     """
     if bf_path is None:
         bf_path = blockfile.get_filename()
-    return blockfile.read(str(bf_path.resolve()))
+    return blockfile.read(bf_path)
 
 
 def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) -> str:
@@ -35,10 +35,19 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
     if should_colour:
         if not group.is_blocking():
             ret = colour.grey(ret)
+
         # TODO #temp
         if group.state.is_paused:
-            ret = "* " + ret
-    # TODO #enhancement: colouring for 'schedule-based constraint would be open, but
+            ret = colour.yellow("(paused) ") + ret
+
+        remaining = group.duration_summary()
+        if remaining is not None:
+            remaining = f" ({remaining})"
+            if should_colour:
+                c = colour.red if group.duration_remaining().total_seconds() <= 0 else colour.cyan
+                remaining = c(remaining)
+            ret += remaining
+    # TODO #enhancement: something for 'schedule-based constraint would be open, but
     # group is paused.'
     return ret
 
@@ -88,17 +97,19 @@ def set_paused (group_name: str, paused: bool, bf_path: Path | None = None) -> N
     # writing to a file like this (which also acts as a convenient method of ipc). it
     # might not be too bad ux if we just re-pause anything pausable on shutdown, though.
     # similarly, prob can't have updating-duration-across-reboots-correctly work simply
-    # without something regularly writing a `duration_remaining` value back to a file.
+    # without something regularly writing a `time_spent_paused` value back to a file.
     # that has to be the service, since it's the only thing running over time.
     #
-    # could have separate files for pausedness & `duration_remaining`, since pausedness
-    # will only be written by cli & `duration_remaining` will only be written by the
+    # could have separate files for pausedness & `time_spent_paused`, since pausedness
+    # will only be written by cli & `time_spent_paused` will only be written by the
     # service.
     if paused:
         to_pause.pause()
     else:
         to_pause.unpause()
     logging.info(f'{"" if paused else "un"}paused {to_pause.display_name()}')
+    # TODO #temp
+    print(maybe_coloured_group_name(to_pause, True))
 
 
 def pause (group_name: str, bf_path: Path | None = None) -> None:

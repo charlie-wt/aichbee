@@ -1,6 +1,6 @@
 import base64
 from dataclasses import dataclass, field
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt, timedelta, date
 from enum import Enum, auto
 import logging
 import os
@@ -15,9 +15,12 @@ class DurationPeriod(Enum):
     ''' The period over which a duration-based constraint can apply before resetting.
     '''
 
-    DAY   = auto()
-    WEEK  = auto()
-    MONTH = auto()
+    PER_DAY   = auto()
+    PER_WEEK  = auto()
+    PER_MONTH = auto()
+    EACH_DAY   = auto()
+    EACH_WEEK  = auto()
+    EACH_MONTH = auto()
 
     def from_str (string: str) -> 'DurationPeriod':
         ''' Parse ``string`` into a ``DurationPeriod`` (based on it being the prefix of
@@ -25,6 +28,41 @@ class DurationPeriod(Enum):
         '''
         return util.get_unique_enum_prefix_match(
             string, DurationPeriod, value_name="duration period")
+
+    def next_reset_at (self, prev_reset: dt) -> dt:
+        ''' If this ``DurationPeriod`` last reset at time ``prev_reset``, at what point
+        will it next be ready to reset again?
+
+        :param prev_reset: When did we last reset, to compare to 'now'?
+        :returns: When this ``DurationPeriod`` should next 'reset'/roll over.
+        '''
+
+        def after_timedelta (*args, **kwargs) -> dt:
+            return prev_reset + timedelta(*args, **kwargs)
+
+        def midnight (d: date) -> dt:
+            return dt.combine(d, dt.min.time())
+
+        match self:
+            # `PER_x`: get 1 `x` after the previous reset
+            case DurationPeriod.PER_DAY:
+                return after_timedelta(days=1)
+            case DurationPeriod.PER_WEEK:
+                return after_timedelta(weeks=1)
+            case DurationPeriod.PER_MONTH:
+                return after_timedelta(months=1)
+            # `EACH_x`: get the start of the next `x` after previous reset, at midnight
+            case DurationPeriod.EACH_DAY:
+                return midnight(prev_reset.date() + timedelta(days=1))
+            case DurationPeriod.EACH_WEEK:
+                # TODO #test
+                return midnight(prev_reset.date() + timedelta(weeks=1))
+            case DurationPeriod.EACH_MONTH:
+                return midnight(
+                    (prev_reset.replace(day=1) + timedelta(days=32)).replace(day=1).date()
+                )
+
+        raise NotImplementedError(f"Need to implement next_reset_at for {self}.")
 
     def ready_to_reset (self, prev_reset: dt, now: dt) -> bool:
         ''' If the current time is ``now``, and this ``DurationPeriod`` last reset at
@@ -35,18 +73,7 @@ class DurationPeriod(Enum):
         :returns: Whether this ``DurationPeriod`` should 'reset'/roll over.
         '''
 
-        def with_timedelta (*args, **kwargs) -> bool:
-            return now - prev_reset > timedelta(*args, **kwargs)
-
-        match self:
-            case DurationPeriod.DAY:
-                return with_timedelta(days=1)
-            case DurationPeriod.WEEK:
-                return with_timedelta(weeks=1)
-            case DurationPeriod.MONTH:
-                return now.year > prev_reset.year or now.month > prev_reset.month
-
-        raise NotImplementedError(f"Need to implement ready_to_reset for {self}.")
+        return now > self.next_reset_at(prev_reset)
 
 
 @dataclass
@@ -65,16 +92,16 @@ class Duration:
 class State:
     is_paused: bool = False
     prev_duration_reset: dt | None = None
-    duration_remaining: timedelta | None = None
+    time_spent_paused: timedelta | None = None
     # TODO #verify: to actually make things robust to crashes, does this need to be part
     # of some separate 'transient state', not this 'durable state' that gets saved to a
     # file?
-    prev_duration_remaining_update: dt | None = None
+    prev_time_spent_paused_update: dt | None = None
 
     def reset_duration(self, now: dt, duration: Duration) -> None:
         self.prev_duration_reset = now
-        self.duration_remaining = timedelta(hours=duration.length_hours)
-        self.prev_duration_remaining_update = now
+        self.time_spent_paused = timedelta()
+        self.prev_time_spent_paused_update = now
 
 
 @dataclass
@@ -86,77 +113,133 @@ class BlockGroup:
     sites: list[str] = field(default_factory=list)
     schedule_ranges: list[TimeRange] = field(default_factory=list)
     duration: Duration | None = None
-    config_filename: str = ""
+    config_path: str = ""  # this should be absolute
 
     # state
     state: State = field(default_factory=State)
 
 
     def display_name (self) -> str:
+        ''' Get a string (either group name or a placeholder) suitable for printing. '''
         return self.name or '(unnamed group)'
 
+    def canonical_name (self) -> str:
+        ''' Get a name that should (hopefully) be unique even if we've run aichbee with
+        different configurations. '''
+        return self.config_path + self.name
+
+    def state_filename (self) -> str:
+        ''' Get the filename (not including directories) of this group's state file. '''
+        return base64.b64encode(bytes(self.canonical_name(), 'utf-8')).decode('utf-8')
+
     def state_path (self) -> Path:
+        ''' Get the full path to this group's state file.
+
+        Note: will raise a ``ValueError`` if this group has no name: any block group
+        that needs to save state must have a unique name.
+        '''
         if self.name is None:
             raise ValueError("Tried to get the state path of an unnamed block group. "
                              "Any block group with a duration-based constraint (and "
                              "thus needing to save state) must have a unique name.")
 
-        canonical_name: str = self.config_filename + self.name
-        filename: str = base64.b64encode(bytes(canonical_name, 'utf-8')).decode('utf-8')
-
         # TODO #correctness: should this be `state_dir`; it's likely gonna be made by (&
         # thus owned by) root; feels like it should then be put somewhere more root-y?
-        return util.state_dir() / filename
+        return util.state_dir() / self.state_filename()
+
+    def duration_remaining (self) -> timedelta | None:
+        ''' Get the amount of time remaining on our duration-based constraint, if we
+        have one.
+
+        Note that if we've exceeded our allowed duration, this result will be negative.
+        '''
+        if self.duration is None:
+            return None
+
+        spent_paused = self.state.time_spent_paused
+        if spent_paused is None:
+            spent_paused = timedelta()
+
+        return timedelta(hours=self.duration.length_hours) - spent_paused
+
+    def duration_summary (self) -> str | None:
+        ''' Get a human-readable summary of the state of our duration constraint, if we
+        have one.
+        '''
+        remaining: timedelta | None = self.duration_remaining()
+
+        if remaining is None:
+            return None
+
+        remaining = max(timedelta(), remaining)  # don't go under 00:00:00
+
+        res: str = f"{remaining} remaining"
+
+        if self.state.prev_duration_reset is not None:
+            # we can't say when the next reset will be if we've not reset before
+            until = self.duration.period.next_reset_at(self.state.prev_duration_reset)
+            res = f"{res} until {until.replace(microsecond=0)}"
+
+        return res
 
     def is_blocking (self, now: dt | None = None) -> bool:
-        ''' If the current time is `now`, should this group's blocks be applied? '''
-        return self.within_all_constraints(now) and not self.state.is_paused
+        ''' If the current time is ``now``, should this group's blocks be applied? '''
+        return self.within_all_constraints(now)# and not self.state.is_paused
 
     def within_all_constraints (self, now: dt | None = None) -> bool:
-        ''' If the current time is `now`, do all of our constraints say our blocks
-        should be applied? '''
+        ''' If the current time is ``now``, do all of our constraints say our blocks
+        should be applied?
+        '''
         if now is None:
             now = dt.now()
-        return (self.within_duration_constraints(now) or
-                self.within_schedule_constraints(now))
+
+        if self.within_schedule_constraints(now):
+            return True
+
+        if self.duration is not None:
+            return self.within_duration_constraints(now) or not self.state.is_paused
+
+        return False
 
     def within_duration_constraints (self, now: dt) -> bool:
-        ''' If the current time is `now`, does the group's duration constraint say the
+        ''' If the current time is ``now``, does the group's duration constraint say the
         blocks should be applied (if it exists)?
         '''
         if self.duration is None:
             return False
 
         if (self.state.prev_duration_reset is None or
-            self.state.duration_remaining is None or
+            self.state.time_spent_paused is None or
             self.duration.period.ready_to_reset(now, self.state.prev_duration_reset)
            ):
             return False
 
-        return self.state.duration_remaining.total_seconds() <= 0
+        return self.duration_remaining().total_seconds() <= 0
 
     def update_state (self, now: dt | None = None) -> None:
+        ''' Update this group's ``state`` assuming the current time is now ``now``, and
+        (if needed) save it to its file.
+        '''
         if self.duration is None:
             return
 
         if now is None:
             now = dt.now()
 
-        if self.state.is_paused or self.within_schedule_constraints(now):
-            return
+        # Only updated paused duration stuff if we're also within schedule constraints.
+        if not (self.state.is_paused or self.within_schedule_constraints(now)):
+            if (
+                self.state.prev_duration_reset is None or
+                self.state.time_spent_paused is None or
+                self.state.prev_time_spent_paused_update is None or
+                self.duration.period.ready_to_reset(self.state.prev_duration_reset, now)
+            ):
+                self.state.reset_duration(now, self.duration)
 
-        if (
-            self.state.prev_duration_reset is None or
-            self.state.duration_remaining is None or
-            self.state.prev_duration_remaining_update is None or
-            self.duration.period.ready_to_reset(self.state.prev_duration_reset, now)
-        ):
-            self.state.reset_duration(now, self.duration)
+            to_add: timedelta = now - self.state.prev_time_spent_paused_update
+            self.state.time_spent_paused += to_add
 
-        to_deduct: timedelta = now - self.state.prev_duration_remaining_update
-        self.state.duration_remaining -= to_deduct
-        self.state.prev_duration_remaining_update = now
-
+        self.state.prev_time_spent_paused_update = now
         self.save_state()
 
     def save_state (self) -> None:
@@ -181,19 +264,24 @@ class BlockGroup:
             self.state = pickle.load(f)
 
     def pause (self) -> None:
-        self.update_state()
+        ''' Pause this group's blocking. '''
         self.state.is_paused = True
-        self.save_state()
+        self.update_state()
 
     def unpause (self) -> None:
+        ''' Unpause this group's blocking. '''
         self.state.is_paused = False
-        self.save_state()
         self.update_state()
 
     def within_schedule_constraints (self, now: dt) -> bool:
-        ''' If the current time is `now`, do the group's schedule constraints say the
+        ''' If the current time is ``now``, do the group's schedule constraints say the
         blocks should be applied?
         '''
+
+        # If we have *just* a duration constraint, then we should never constrain based
+        # on schedule.
+        if self.duration is not None and len(self.schedule_ranges) == 0:
+            return False
 
         return within_constraints(Time.from_dt(now), self.schedule_ranges)
 
@@ -204,7 +292,6 @@ class BlockGroup:
         Currently, returns ``False`` if any of the time-only constraints (eg. "@ 01:00 -
         02:00") *or* any of the day-based constraints (eg. "@ mon 03:00 - fri 04:00")
         overlap at all in time (they're checked independently).
-
         '''
 
         def ranges_consistent (ranges: list[TimeRange]) -> bool:

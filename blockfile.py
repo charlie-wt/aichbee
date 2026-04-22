@@ -41,8 +41,10 @@ def read (filename: str | Path, load_state: bool = True) -> list[BlockGroup]:
                        maintain things like remaining durations.
     '''
 
-    if isinstance(filename, Path):
-        filename = str(filename.resolve())
+    # ensure path is absolute (and a `str`)
+    if isinstance(filename, str):
+        filename = Path(filename)
+    filename = str(filename.resolve())
 
     blockgroups = []
 
@@ -64,7 +66,7 @@ def read (filename: str | Path, load_state: bool = True) -> list[BlockGroup]:
             else:
                 in_a_group = True
                 blockgroups.append(BlockGroup(parse.parse_name(line),
-                                              config_filename=filename))
+                                              config_path=filename))
                 current_group = blockgroups[-1]
         elif in_a_group:
             if line[0] == '@':

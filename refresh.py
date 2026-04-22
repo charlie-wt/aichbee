@@ -67,7 +67,7 @@ def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
         logging.debug(f'group {group.display_name()}:')
 
         if not group.is_blocking():
-            logging.debug('\t not in time range')
+            logging.debug("\t shouldn't be blocking right now")
             continue
 
         # this site should be blocked -- construct lines of new file

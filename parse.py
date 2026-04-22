@@ -64,7 +64,7 @@ def parse_schedule_constraint (line: str, group: BlockGroup) -> None:
                      f"line: '{line}'")
 
 
-DURATION_PAT = re.compile(r'<(?P<length>\d+)hrs?\s+per\s+(?P<period>\w+)')
+DURATION_PAT = re.compile(r'<(?P<length>\d+\.?\d*)hrs?\s+(?P<mode>per|each)\s+(?P<period>\w+)')
 
 
 def parse_duration_constraint (line: str, group: BlockGroup) -> None:
@@ -86,5 +86,7 @@ def parse_duration_constraint (line: str, group: BlockGroup) -> None:
         raise ValueError(f"Block group {group.display_name()}: couldn't parse "
                          f"blockfile line: '{line}'")
 
-    group.duration = Duration(DurationPeriod.from_str(m.group("period")),
-                              float(m.group("length")))
+    group.duration = Duration(
+        DurationPeriod.from_str(f"{m.group('mode')}_{m.group('period')}"),
+        float(m.group("length"))
+    )

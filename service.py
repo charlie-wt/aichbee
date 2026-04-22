@@ -10,6 +10,7 @@ import os
 import blockfile as bf
 from blocktime import Time, within_constraints
 import refresh as rf
+import util
 
 
 '''
@@ -48,7 +49,7 @@ def main ():
 
     # location of blockfile
     logging.debug(f'getting blockfile from {args.blockfile}')
-    blocks = bf.read(args.blockfile)
+    blocks: list[BlockGroup] = bf.read(args.blockfile)
     for b in blocks: logging.debug(b)
 
     # do an initial refresh
@@ -60,25 +61,28 @@ def main ():
         else:
             rf.unblock(args.watchfile, group)
 
-    # configure inotify
-    inotify = INotify()
-    wd = inotify.add_watch(watchfile_dir, flags.MODIFY)
-    @contextmanager
-    def suspend_watch():
-        nonlocal wd
-        try:
-            inotify.rm_watch(wd)
-            yield None
-        finally:
-            wd = inotify.add_watch(watchfile_dir, flags.MODIFY)
-
     # TODO #temp
     for b in blocks:
         if b.duration is not None:
             b.update_state(prevtime)
 
-    # TODO #finish: update state on those block groups that need it.
-    # read events, maybe respond
+    # configure inotify
+    inotify = INotify()
+    watchfile_watch_descriptor: int = inotify.add_watch(watchfile_dir, flags.MODIFY)
+    state_watch_descriptor: int = inotify.add_watch(util.state_dir(), flags.MODIFY)
+
+    @contextmanager
+    def suspend_watch():
+        nonlocal watchfile_watch_descriptor
+        nonlocal state_watch_descriptor
+        try:
+            inotify.rm_watch(watchfile_watch_descriptor)
+            inotify.rm_watch(state_watch_descriptor)
+            yield None
+        finally:
+            watchfile_watch_descriptor = inotify.add_watch(watchfile_dir, flags.MODIFY)
+            state_watch_descriptor = inotify.add_watch(util.state_dir(), flags.MODIFY)
+
     while True:
         print('=== checking whether to refresh watched file ==========================')
 
@@ -97,10 +101,28 @@ def main ():
         prevtime = now
         # check for file modification events
         for event in inotify.read(timeout=timeout_ms):
-            if event.name == watchfile_name and group.is_blocking(now):
-                logging.debug("watched file was edited!")
-                with suspend_watch():
-                    rf.block(args.watchfile, blocks)
+            if event.wd == watchfile_watch_descriptor:
+                if event.name == watchfile_name:
+                    # changed watchfile (just reaffirm blocks)
+                    logging.debug("watched file was edited!")
+                    with suspend_watch():
+                        rf.block(args.watchfile, blocks)
+            elif event.wd == state_watch_descriptor:
+                # changed state (could be cli (un)pausing a group)
+                for group in blocks:
+                    if group.state_filename() == event.name:
+                        logging.debug(f'state of {group.display_name()} changed')
+                        with suspend_watch():
+                            group.load_state()
+                            if group.is_blocking():
+                                rf.block(args.watchfile, group)
+                            else:
+                                rf.unblock(args.watchfile, group)
+
+            # TODO #bug
+            # with suspend_watch():
+            #     for group in blocks:
+            #         group.update_state()
 
 if __name__ == '__main__':
     main()
