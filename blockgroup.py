@@ -7,9 +7,10 @@ import os
 from pathlib import Path
 import pickle
 
-from blocktime import Time, TimeRange, within_constraints
+from blocktime import next_change_time, Time, TimeRange, within_constraints
 import util
 
+import sys
 
 class DurationPeriod(Enum):
     ''' The period over which a duration-based constraint can apply before resetting.
@@ -184,7 +185,7 @@ class BlockGroup:
 
     def is_blocking (self, now: dt | None = None) -> bool:
         ''' If the current time is ``now``, should this group's blocks be applied? '''
-        return self.within_all_constraints(now)# and not self.state.is_paused
+        return self.within_all_constraints(now)
 
     def within_all_constraints (self, now: dt | None = None) -> bool:
         ''' If the current time is ``now``, do all of our constraints say our blocks
@@ -289,6 +290,16 @@ class BlockGroup:
             return False
 
         return within_constraints(Time.from_dt(now), self.schedule_ranges)
+
+    def next_schedule_change (self, now: dt) -> dt | None:
+        ''' If the current date & time is ``now``, get the next time when one of our
+        schedule constraints will change from blocked to unblocked, or vice versa.
+
+        If this block group has no schedule constraints, will return ``None``.
+        '''
+        if len(self.schedule_ranges) == 0:
+            return None
+        return min(next_change_time(now, r) for r in self.schedule_ranges)
 
     def schedule_constraints_consistent (self) -> bool:
         '''

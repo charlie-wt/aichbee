@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# TODO #cleanup
-
 
 # install required python deps
 command -v python3 > /dev/null || sudo apt install python3
-command -v pip3 > /dev/null || sudo apt install python3-pip
+# TODO #remove
+# command -v pip3 > /dev/null || sudo apt install python3-pip
 
-if ! sudo -H pip3 show inotify_simple > /dev/null 2>&1; then
-    # install as root outside of a venv, since the service has to run as root to edit a
-    # system file.
-    sudo -H pip3 install inotify_simple --break-system-packages
-fi
+# TODO #remove
+# if ! sudo -H pip3 show inotify_simple > /dev/null 2>&1; then
+#     # install as root outside of a venv, since the service has to run as root to edit a
+#     # system file.
+#     sudo -H pip3 install inotify_simple --break-system-packages
+# fi
 
 required_python_minor=10
 python_minor="$(/usr/bin/env python3 -c 'import sys; print(sys.version_info.minor)')"
