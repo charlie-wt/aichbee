@@ -4,10 +4,12 @@ import argparse
 import asyncio
 from contextlib import contextmanager
 from datetime import datetime as dt
+import functools
 # from inotify_simple import INotify, flags
 import logging
 import os
 from pathlib import Path
+import signal
 
 import blockfile as bf
 from blocktime import Time, within_constraints
@@ -44,16 +46,14 @@ def main ():
 
     args = parse_args()
 
-    # set up logging
+    # setup
     logging.basicConfig(format='%(message)s',
                         level='NOTSET' if args.verbose else 'WARNING')
 
-    # file to watch
     args.watchfile = os.path.abspath(args.watchfile)
     logging.debug(f'watching {args.watchfile}')
     # watchfile_dir, watchfile_name = os.path.split(args.watchfile)
 
-    # location of blockfile
     logging.debug(f'getting blockfile from {args.blockfile}')
     blocks: list[BlockGroup] = bf.read(args.blockfile)
     for b in blocks: logging.debug(b)
@@ -91,6 +91,7 @@ def main ():
     #         watchfile_watch_descriptor = inotify.add_watch(watchfile_dir, flags.MODIFY)
     #         # state_watch_descriptor = inotify.add_watch(util.state_dir(), flags.MODIFY)
 
+    # define event loop tasks
     watchfile_prev_modified_time: float = os.stat(args.watchfile).st_mtime
     watchfile_lock = asyncio.Lock()
 
@@ -126,17 +127,22 @@ def main ():
             logging.debug("refreshing from schedule!")
             await locked_refresh()
 
+    # start event loop
     loop = asyncio.new_event_loop()
     asyncio.ensure_future(refresh_on_schedule(), loop=loop)
     asyncio.ensure_future(watch_watchfile_for_changes(), loop=loop)
 
+    # handle signals to stop cleanly
+    if hasattr(signal, 'SIGINT'):
+        loop.add_signal_handler(signal.SIGINT, loop.stop)
+    if hasattr(signal, 'SIGTERM'):
+        loop.add_signal_handler(signal.SIGTERM, loop.stop)
+
     try:
         # run the event loop. hit ctrl-c to stop.
         loop.run_forever()
-    except KeyboardInterrupt:
-        logging.warning("Stopping")
     finally:
-        # done; try to close the event loop cleanly.
+        # cleanup
         pending = asyncio.all_tasks(loop)
         for task in pending:
             task.cancel()
