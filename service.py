@@ -21,6 +21,9 @@ A very simple program to set time constraints on websites.
 '''
 
 
+WATCHFILE_POLL_RATE_SECONDS: float = 1
+
+
 def parse_args ():
     parser = argparse.ArgumentParser()
     parser.add_argument('-w', '--watchfile',
@@ -37,7 +40,7 @@ def parse_args ():
 
 import sys
 def main ():
-    timeout_ms = 30000
+    # timeout_ms = 30000
 
     args = parse_args()
 
@@ -65,12 +68,11 @@ def main ():
     # do an initial refresh
     full_refresh()
 
-    prevtime = dt.now()
-
+    start_time = dt.now()
     # TODO #temp
     for b in blocks:
         if b.duration is not None:
-            b.update_state(prevtime)
+            b.update_state(start_time)
 
     # # configure inotify
     # inotify = INotify()
@@ -89,10 +91,8 @@ def main ():
     #         watchfile_watch_descriptor = inotify.add_watch(watchfile_dir, flags.MODIFY)
     #         # state_watch_descriptor = inotify.add_watch(util.state_dir(), flags.MODIFY)
 
-    watchfile_lock = asyncio.Lock()
-
-    watchfile_poll_rate_seconds: float = 1
     watchfile_prev_modified_time: float = os.stat(args.watchfile).st_mtime
+    watchfile_lock = asyncio.Lock()
 
     async def locked_refresh():
         nonlocal watchfile_prev_modified_time
@@ -105,40 +105,36 @@ def main ():
         watchfile_prev_modified_time = os.stat(args.watchfile).st_mtime
 
         while True:
-            await asyncio.sleep(watchfile_poll_rate_seconds)
+            await asyncio.sleep(WATCHFILE_POLL_RATE_SECONDS)
 
             new_time: float = os.stat(args.watchfile).st_mtime
             if new_time != watchfile_prev_modified_time:
                 logging.debug("watchfile changed!")
                 await locked_refresh()
 
-    async def wait_for_next_schedule_boundary():
-        now = dt.now()
-
-        next_changes = [group.next_schedule_change(now) for group in blocks]
-        next_changes = [c for c in next_changes if c is not None]
-        next_boundary: dt = min(next_changes)
-
-        logging.debug(f"next schedule constraint boundary at {next_boundary}")
-
-        await asyncio.sleep((next_boundary - now).total_seconds())
-
-    async def schedule_coro():
+    async def refresh_on_schedule():
         while True:
-            await asyncio.create_task(wait_for_next_schedule_boundary())
+            now = dt.now()
+
+            next_changes = [group.next_schedule_change(now) for group in blocks]
+            next_changes = [c for c in next_changes if c is not None]
+            next_boundary: dt = min(next_changes)
+            logging.debug(f"next schedule constraint boundary at {next_boundary}")
+
+            await asyncio.sleep((next_boundary - now).total_seconds())
 
             logging.debug("refreshing from schedule!")
             await locked_refresh()
 
     loop = asyncio.new_event_loop()
-    asyncio.ensure_future(schedule_coro(), loop=loop)
+    asyncio.ensure_future(refresh_on_schedule(), loop=loop)
     asyncio.ensure_future(watch_watchfile_for_changes(), loop=loop)
 
     try:
         # run the event loop. hit ctrl-c to stop.
         loop.run_forever()
     except KeyboardInterrupt:
-        print("Stopping")
+        logging.warning("Stopping")
     finally:
         # done; try to close the event loop cleanly.
         pending = asyncio.all_tasks(loop)
@@ -148,7 +144,6 @@ def main ():
         # run the loop briefly to allow cancelled tasks to finish their cleanup.
         loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
         loop.close()
-
 
 
 if __name__ == '__main__':

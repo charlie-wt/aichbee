@@ -144,8 +144,6 @@ class BlockGroup:
                              "Any block group with a duration-based constraint (and "
                              "thus needing to save state) must have a unique name.")
 
-        # TODO #correctness: should this be `state_dir`; it's likely gonna be made by (&
-        # thus owned by) root; feels like it should then be put somewhere more root-y?
         return util.state_dir() / self.state_filename()
 
     def duration_remaining (self) -> timedelta | None:
