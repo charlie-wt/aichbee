@@ -27,14 +27,14 @@ service_filename="${template_filename%.template}"
 src_location_template_var="<<SRC_LOC>>"
 generated_file_message="# THIS FILE IS GENERATED: PLEASE MODIFY "$template_filename" INSTEAD"
 
-cp "$template_filename" "$service_filename"
 src_location=$(dirname "$(readlink -e "$0")")
-src_location=${src_location//\//\\/}  # escape slashes to not upset `sed`
-sed -i "s/$src_location_template_var/$src_location/g" "$service_filename"
-sed -i "1s/^/$generated_file_message\n\n/" "$service_filename"
+esc_src_location=${src_location//\//\\/}  # escape slashes to not upset `sed`
+cp "$src_location/$template_filename" "$src_location/$service_filename"
+sed -i "s/$src_location_template_var/$esc_src_location/g" "$src_location/$service_filename"
+sed -i "1s/^/$generated_file_message\n\n/" "$src_location/$service_filename"
 
 # install and enable the systemd service (for run-on-startup)
-sudo cp "$service_filename" /etc/systemd/system/ &&
+sudo cp "$src_location/$service_filename" /etc/systemd/system/ &&
 sudo systemctl daemon-reload &&
 sudo systemctl enable "$service_filename" &&
 sudo systemctl start "$service_filename"
