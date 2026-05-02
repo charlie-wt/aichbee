@@ -4,7 +4,7 @@ from datetime import datetime as dt
 import re
 
 from blockgroup import BlockGroup, Duration, DurationPeriod
-from blocktime import Time, TimeRange, Weekday
+from schedule import Time, TimeRange, Weekday
 
 
 NAME_PAT = re.compile(r'\s*=\s*(?P<name>.*)\s*')
@@ -78,8 +78,8 @@ def parse_duration_constraint (line: str, group: BlockGroup) -> None:
 
     if group.name is None:
         raise ValueError("Tried to parse a duration in an unnamed block group. Any "
-                         "block group with a duration-based constraint (and thus "
-                         "needing to save state) must have a unique name.")
+                         "block group with a duration-based constraint must have a "
+                         "unique name, in order to save its state.")
 
     m = re.match(DURATION_PAT, line)
     if m is None:

@@ -11,10 +11,9 @@ import os
 from pathlib import Path
 import signal
 
-import blockfile as bf
-from blocktime import Time, within_constraints
-import refresh as rf
-import util
+import blockfile
+import refresh
+# import util
 
 
 '''
@@ -32,7 +31,7 @@ def parse_args ():
                         default=os.path.abspath(os.path.join(os.path.sep, 'etc', 'hosts')),
                         help='Path to file to watch & manage (eg. hosts).')
     parser.add_argument('-b', '--blockfile',
-                        default=str(bf.get_filename()),
+                        default=str(blockfile.get_filename()),
                         help='Path to blockfile to enforce.')
     parser.add_argument('-v', '--verbose',
                         action='store_true',
@@ -40,13 +39,12 @@ def parse_args ():
     return parser.parse_args()
 
 
-import sys
 def main ():
     # timeout_ms = 30000
 
     args = parse_args()
 
-    # setup
+    # setup.
     logging.basicConfig(format='%(message)s',
                         level='NOTSET' if args.verbose else 'WARNING')
 
@@ -55,17 +53,16 @@ def main ():
     # watchfile_dir, watchfile_name = os.path.split(args.watchfile)
 
     logging.debug(f'getting blockfile from {args.blockfile}')
-    blocks: list[BlockGroup] = bf.read(args.blockfile)
+    blocks: list[BlockGroup] = blockfile.read(args.blockfile)
     for b in blocks: logging.debug(b)
 
     def full_refresh():
         for group in blocks:
             if group.is_blocking():
-                rf.block(args.watchfile, group)
+                refresh.block(args.watchfile, group)
             else:
-                rf.unblock(args.watchfile, group)
+                refresh.unblock(args.watchfile, group)
 
-    # do an initial refresh
     full_refresh()
 
     start_time = dt.now()
@@ -91,7 +88,7 @@ def main ():
     #         watchfile_watch_descriptor = inotify.add_watch(watchfile_dir, flags.MODIFY)
     #         # state_watch_descriptor = inotify.add_watch(util.state_dir(), flags.MODIFY)
 
-    # define event loop tasks
+    # define event loop tasks.
     watchfile_prev_modified_time: float = os.stat(args.watchfile).st_mtime
     watchfile_lock = asyncio.Lock()
 
@@ -127,12 +124,12 @@ def main ():
             logging.debug("refreshing from schedule!")
             await locked_refresh()
 
-    # start event loop
+    # start event loop.
     loop = asyncio.new_event_loop()
     asyncio.ensure_future(refresh_on_schedule(), loop=loop)
     asyncio.ensure_future(watch_watchfile_for_changes(), loop=loop)
 
-    # handle signals to stop cleanly
+    # handle signals to stop cleanly.
     if hasattr(signal, 'SIGINT'):
         loop.add_signal_handler(signal.SIGINT, loop.stop)
     if hasattr(signal, 'SIGTERM'):
@@ -142,7 +139,7 @@ def main ():
         # run the event loop. hit ctrl-c to stop.
         loop.run_forever()
     finally:
-        # cleanup
+        # cleanup.
         pending = asyncio.all_tasks(loop)
         for task in pending:
             task.cancel()

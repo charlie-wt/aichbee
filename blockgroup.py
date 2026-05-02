@@ -7,10 +7,9 @@ import os
 from pathlib import Path
 import pickle
 
-from blocktime import next_change_time, Time, TimeRange, within_constraints
+from schedule import next_change_time, Time, TimeRange, within_constraints
 import util
 
-import sys
 
 class DurationPeriod(Enum):
     ''' The period over which a duration-based constraint can apply before resetting.
@@ -182,12 +181,8 @@ class BlockGroup:
         return res
 
     def is_blocking (self, now: dt | None = None) -> bool:
-        ''' If the current time is ``now``, should this group's blocks be applied? '''
-        return self.within_all_constraints(now)
-
-    def within_all_constraints (self, now: dt | None = None) -> bool:
-        ''' If the current time is ``now``, do all of our constraints say our blocks
-        should be applied?
+        ''' If the current time is ``now`` (defaulting to the current time), should this
+        group's blocks be applied?
         '''
         if now is None:
             now = dt.now()
@@ -214,6 +209,28 @@ class BlockGroup:
             return False
 
         return self.duration_remaining().total_seconds() <= 0
+
+    def within_schedule_constraints (self, now: dt) -> bool:
+        ''' If the current time is ``now``, do the group's schedule constraints say the
+        blocks should be applied?
+        '''
+
+        # If we have *just* a duration constraint, then we should never constrain based
+        # on schedule.
+        if self.duration is not None and len(self.schedule_ranges) == 0:
+            return False
+
+        return within_constraints(Time.from_dt(now), self.schedule_ranges)
+
+    def next_schedule_change (self, now: dt) -> dt | None:
+        ''' If the current date & time is ``now``, get the next time when one of our
+        schedule constraints will change from blocked to unblocked, or vice versa.
+
+        If this block group has no schedule constraints, will return ``None``.
+        '''
+        if len(self.schedule_ranges) == 0:
+            return None
+        return min(next_change_time(now, r) for r in self.schedule_ranges)
 
     def update_state (self, now: dt | None = None) -> None:
         ''' Update this group's ``state`` assuming the current time is now ``now``, and
@@ -277,28 +294,6 @@ class BlockGroup:
         self.state.is_paused = False
         self.update_state()
 
-    def within_schedule_constraints (self, now: dt) -> bool:
-        ''' If the current time is ``now``, do the group's schedule constraints say the
-        blocks should be applied?
-        '''
-
-        # If we have *just* a duration constraint, then we should never constrain based
-        # on schedule.
-        if self.duration is not None and len(self.schedule_ranges) == 0:
-            return False
-
-        return within_constraints(Time.from_dt(now), self.schedule_ranges)
-
-    def next_schedule_change (self, now: dt) -> dt | None:
-        ''' If the current date & time is ``now``, get the next time when one of our
-        schedule constraints will change from blocked to unblocked, or vice versa.
-
-        If this block group has no schedule constraints, will return ``None``.
-        '''
-        if len(self.schedule_ranges) == 0:
-            return None
-        return min(next_change_time(now, r) for r in self.schedule_ranges)
-
     def schedule_constraints_consistent (self) -> bool:
         '''
         Are this group's (schedule-based) constraints consistent with each other?
@@ -351,6 +346,7 @@ class BlockGroup:
         else:
             res += f'\t\t{self.duration}\n'
 
+        # TODO #enhancement: ellipsise
         res += '\tSites to block:\n'
         for s in self.sites:
             res += f'\t\t{s}\n'

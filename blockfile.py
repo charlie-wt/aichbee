@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 from blockgroup import BlockGroup
-import blocktime as bt
 import parse
 import util
 

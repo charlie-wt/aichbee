@@ -36,7 +36,6 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
         if not group.is_blocking():
             ret = colour.grey(ret)
 
-        # TODO #temp
         if group.state.is_paused:
             ret = colour.yellow("(paused) ") + ret
 
@@ -47,8 +46,6 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
                 c = colour.red if group.duration_remaining().total_seconds() <= 0 else colour.cyan
                 remaining = c(remaining)
             ret += remaining
-    # TODO #enhancement: something for 'schedule-based constraint would be open, but
-    # group is paused.'
     return ret
 
 
@@ -73,8 +70,6 @@ def ls (blocked_filter: bool | None = None,
             print(maybe_coloured_group_name(g, should_colour))
 
 
-# TODO #enhancement: either disallow duplicate group names earlier, or add an extra
-# interactive step to select a group based on a preview of its contents.
 def get_prefix_group_match (name_prefix: str, groups: list[BlockGroup]) -> BlockGroup:
     """ Like ``utils.get_unique_prefix_match``, but for group names; return the matching
     ``BlockGroup`` itself.
@@ -84,7 +79,6 @@ def get_prefix_group_match (name_prefix: str, groups: list[BlockGroup]) -> Block
     return next(g for g in groups if g.name == group_name)
 
 
-# TODO #correctness: return whether the group is now open?
 def set_paused (group_name: str, paused: bool, bf_path: Path | None = None) -> None:
     """ Either pause or unpause a block group, if it's one with a duration-based block.
     """
@@ -107,9 +101,7 @@ def set_paused (group_name: str, paused: bool, bf_path: Path | None = None) -> N
         to_pause.pause()
     else:
         to_pause.unpause()
-    logging.info(f'{"" if paused else "un"}paused {to_pause.display_name()}')
-    # TODO #temp
-    print(maybe_coloured_group_name(to_pause, True))
+    logging.warning(maybe_coloured_group_name(to_pause, True))
 
 
 def pause (group_name: str, bf_path: Path | None = None) -> None:
