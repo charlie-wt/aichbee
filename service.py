@@ -13,7 +13,7 @@ import signal
 
 import blockfile
 import refresh
-# import util
+import util
 
 
 '''
@@ -52,6 +52,7 @@ def main ():
     logging.debug(f'watching {args.watchfile}')
     # watchfile_dir, watchfile_name = os.path.split(args.watchfile)
 
+    args.blockfile = str(Path(args.blockfile).resolve())
     logging.debug(f'getting blockfile from {args.blockfile}')
     blocks: list[BlockGroup] = blockfile.read(args.blockfile)
     for b in blocks: logging.debug(b)
@@ -124,10 +125,104 @@ def main ():
             logging.debug("refreshing from schedule!")
             await locked_refresh()
 
+    def parse_group_name_from_message(full_group_name: str) -> BlockGroup | None:
+        config_path, group_name = full_group_name.split("::", maxsplit=1)
+
+        if args.blockfile != config_path:
+            logging.warning("Running under a different config path to us")
+            return None
+
+        return next((g for g in blocks if g.name == group_name), None)
+
+    # TODO #finish
+    # async def enforce_duration(group: BlockGroup):
+    #     remaining = group.duration_remaining()
+    #     assert remaining is not None
+    #     await asyncio.sleep(remaining.total_seconds())
+
+    #     group.update_state()
+    #     await locked_refresh()
+
+    async def receive_message(reader: asyncio.StreamReader,
+                              writer: asyncio.StreamWriter,
+                              message: list[str]):
+        command, *args = message
+
+        if command == "set_paused":
+            if len(args) != 2:
+                logging.error(
+                    "Expected 2 args for 'set_paused' message (canonical group "
+                    f"name + is_paused), but got {len(args)}"
+                )
+                return
+            group: BlockGroup = parse_group_name_from_message(args[0])
+            if group is None:
+                logging.warning("Unknown group")
+                return
+
+            if group.duration is None:
+                return
+
+            if args[1] == "true":
+                # TODO #finish: create a task to periodically update the state
+                group.pause()
+                await locked_refresh()
+            elif args[1] == "false":
+                group.unpause()
+                await locked_refresh()
+            else:
+                logging.error(f"Failed to parse is_paused: {args[1]}")
+        elif command == "request":
+            if args[0] == "is_paused":
+                group: BlockGroup = parse_group_name_from_message(args[1])
+                if group is None:
+                    logging.warning("Unknown group")
+                    return
+
+                response = ["response", args[1], str(group.is_paused).lower()]
+                logging.debug(f"Sending response {response}")
+                writer.write(util.msg_segments(*response))
+                await writer.drain()
+            else:
+                writer.write(util.msg_segments("error", f"unknown request type {args[0]}"))
+                await writer.drain()
+        else:
+            writer.write(util.msg_segments("error", f"unknown command {command}"))
+            await writer.drain()
+
+    async def client_connected(reader: asyncio.StreamReader,
+                               writer: asyncio.StreamWriter):
+        # Try to read until we've got a full message.
+        data = b""
+        while not data.endswith(util.MSG_SEPARATOR.encode()):
+            new_data = await reader.read(util.SOCKET_RECV_BUFSIZE)
+            # TODO #robustness: does StreamReader.read work the same as socket.recv?
+            if not new_data:
+                break
+            data += new_data
+
+        messages = data.decode().strip().split(util.MSG_SEPARATOR)
+
+        for msg in messages:
+            lines = msg.strip().split(util.MSG_SEGMENT_SEPARATOR)
+            logging.debug(f"Received message: {lines}")
+            await receive_message(reader, writer, lines)
+
+        writer.close()
+        await writer.wait_closed()
+
+    async def message_server():
+        server = await asyncio.start_server(
+            client_connected, "0.0.0.0", util.NETWORK_PORT)
+
+        async with server:
+            await server.serve_forever()
+
     # start event loop.
     loop = asyncio.new_event_loop()
     asyncio.ensure_future(refresh_on_schedule(), loop=loop)
     asyncio.ensure_future(watch_watchfile_for_changes(), loop=loop)
+    asyncio.ensure_future(message_server(), loop=loop)
 
     # handle signals to stop cleanly.
     if hasattr(signal, 'SIGINT'):

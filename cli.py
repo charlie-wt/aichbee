@@ -1,16 +1,43 @@
 #!/usr/bin/env python3
 
 import argparse
+import atexit
 import functools
 import logging
 import os
 from pathlib import Path
+import socket
 import sys
 
 import blockfile
 import colour
 from blockgroup import BlockGroup
 import util
+
+
+def send_message(*args: str) -> None:
+    with socket.socket() as s:
+        s.connect(("0.0.0.0", util.NETWORK_PORT))
+        s.sendall(util.msg_segments(*args))
+
+
+def request_data(*args: str) -> list[str]:
+    response = ""
+
+    with socket.socket() as s:
+        s.connect(("0.0.0.0", util.NETWORK_PORT))
+        s.sendall(util.msg_segments("request", *args))
+
+        # Try to read until we've got a full message.
+        response = b""
+        while not response.endswith(util.MSG_SEPARATOR.encode()):
+            if not (new_data := s.recv(util.SOCKET_RECV_BUFSIZE)):
+                break
+            response += new_data
+
+        response = response.decode().strip().split(util.MSG_SEGMENT_SEPARATOR)
+        assert response[0] == "response"
+        return response[1:]
 
 
 @functools.cache
@@ -23,7 +50,14 @@ def groups (bf_path: Path | None = None) -> list[BlockGroup]:
     """
     if bf_path is None:
         bf_path = blockfile.get_filename()
-    return blockfile.read(bf_path)
+    res = blockfile.read(bf_path)
+
+    for group in res:
+        response = request_data("is_paused", group.canonical_name())
+        assert response[0] == group.canonical_name()
+        group.is_paused = response[1] == "true"
+
+    return res
 
 
 def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) -> str:
@@ -36,7 +70,7 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
         if not group.is_blocking():
             ret = colour.grey(ret)
 
-        if group.state.is_paused:
+        if group.is_paused:
             ret = colour.yellow("(paused) ") + ret
 
         remaining = group.duration_summary()
@@ -83,24 +117,11 @@ def set_paused (group_name: str, paused: bool, bf_path: Path | None = None) -> N
     """ Either pause or unpause a block group, if it's one with a duration-based block.
     """
     to_pause: BlockGroup = get_prefix_group_match(group_name, groups(bf_path=bf_path))
-    # TODO #robustness: communicating 'pausedness' via a file like this, which is also
-    # being written to periodically by the service (to update things like duration
-    # remaining), introduces a potential race condition.
-    #
-    # i don't think there's a way to have the pausedness persist across reboots without
-    # writing to a file like this (which also acts as a convenient method of ipc). it
-    # might not be too bad ux if we just re-pause anything pausable on shutdown, though.
-    # similarly, prob can't have updating-duration-across-reboots-correctly work simply
-    # without something regularly writing a `time_spent_paused` value back to a file.
-    # that has to be the service, since it's the only thing running over time.
-    #
-    # could have separate files for pausedness & `time_spent_paused`, since pausedness
-    # will only be written by cli & `time_spent_paused` will only be written by the
-    # service.
-    if paused:
-        to_pause.pause()
-    else:
-        to_pause.unpause()
+
+    send_message("set_paused", to_pause.canonical_name(), str(paused).lower())
+
+    to_pause.is_paused = paused
+    to_pause.load_state()  # TODO #robustness: might be too quick for the service's update (maybe fine if it's updating quick enough anyway)
     logging.warning(maybe_coloured_group_name(to_pause, True))
 
 

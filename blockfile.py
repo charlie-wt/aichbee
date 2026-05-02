@@ -65,7 +65,7 @@ def read (filename: str | Path, load_state: bool = True) -> list[BlockGroup]:
             else:
                 in_a_group = True
                 blockgroups.append(BlockGroup(parse.parse_name(line),
-                                              config_path=filename))
+                                              config_path=Path(filename)))
                 current_group = blockgroups[-1]
         elif in_a_group:
             if line[0] == '@':

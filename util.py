@@ -77,3 +77,14 @@ def state_dir () -> Path:
 
 def config_dir () -> Path:
     return xdg_base_dir("config") / "aichbee"
+
+
+NETWORK_PORT: int = 8888
+
+SOCKET_RECV_BUFSIZE: int = 2**16
+
+MSG_SEPARATOR: str = "\n"
+MSG_SEGMENT_SEPARATOR: str = "\t"
+
+def msg_segments(*args: str) -> bytes:
+    return (MSG_SEGMENT_SEPARATOR.join(args) + MSG_SEPARATOR).encode()

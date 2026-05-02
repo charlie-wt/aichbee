@@ -90,18 +90,12 @@ class Duration:
 
 @dataclass
 class State:
-    is_paused: bool = False
     prev_duration_reset: dt | None = None
     time_spent_paused: timedelta | None = None
-    # TODO #verify: to actually make things robust to crashes, does this need to be part
-    # of some separate 'transient state', not this 'durable state' that gets saved to a
-    # file?
-    prev_time_spent_paused_update: dt | None = None
 
     def reset_duration(self, now: dt, duration: Duration) -> None:
         self.prev_duration_reset = now
         self.time_spent_paused = timedelta()
-        self.prev_time_spent_paused_update = now
 
 
 @dataclass
@@ -113,11 +107,14 @@ class BlockGroup:
     sites: list[str] = field(default_factory=list)
     schedule_ranges: list[TimeRange] = field(default_factory=list)
     duration: Duration | None = None
-    config_path: str = ""  # this should be absolute
+    config_path: Path = field(default_factory=Path)
 
-    # state
+    # persistent state
     state: State = field(default_factory=State)
 
+    # transient state
+    is_paused: bool = False
+    prev_time_spent_paused_update: dt | None = None
 
     def display_name (self) -> str:
         ''' Get a string (either group name or a placeholder) suitable for printing. '''
@@ -126,7 +123,7 @@ class BlockGroup:
     def canonical_name (self) -> str:
         ''' Get a name that should (hopefully) be unique even if we've run aichbee with
         different configurations. '''
-        return self.config_path + self.name
+        return str(self.config_path.resolve()) + "::" + self.name
 
     def state_filename (self) -> str:
         ''' Get the filename (not including directories) of this group's state file. '''
@@ -191,7 +188,7 @@ class BlockGroup:
             return True
 
         if self.duration is not None:
-            return self.within_duration_constraints(now) or not self.state.is_paused
+            return self.within_duration_constraints(now) or not self.is_paused
 
         return False
 
@@ -242,25 +239,27 @@ class BlockGroup:
         if now is None:
             now = dt.now()
 
-        # Only update paused duration stuff if we're also within schedule constraints.
-        if not (self.state.is_paused or self.within_schedule_constraints(now)):
-            if (
-                self.state.prev_duration_reset is None or
-                self.state.time_spent_paused is None or
-                self.state.prev_time_spent_paused_update is None or
-                self.duration.period.ready_to_reset(self.state.prev_duration_reset, now)
-            ):
-                self.state.reset_duration(now, self.duration)
+        if self.is_paused:
+            # Update paused duration, only if we're also outside schedule constraints.
+            if not self.within_schedule_constraints(now):
+                if (
+                    self.state.prev_duration_reset is None or
+                    self.state.time_spent_paused is None or
+                    self.duration.period.ready_to_reset(self.state.prev_duration_reset,
+                                                        now)
+                ):
+                    self.state.reset_duration(now, self.duration)
 
-            to_add: timedelta = now - self.state.prev_time_spent_paused_update
-            self.state.time_spent_paused += to_add
+                if self.prev_time_spent_paused_update is not None:
+                    to_add: timedelta = now - self.prev_time_spent_paused_update
+                    self.state.time_spent_paused += to_add
 
-        # If we run out of time while paused, then automatically unpause
-        if self.state.is_paused and self.within_duration_constraints(now):
-            self.state.is_paused = False
+            # If we run out of time while paused, then automatically unpause.
+            if self.within_duration_constraints(now):
+                self.is_paused = False
 
         # Finish
-        self.state.prev_time_spent_paused_update = now
+        self.prev_time_spent_paused_update = now
         self.save_state()
 
     def save_state (self) -> None:
@@ -286,12 +285,12 @@ class BlockGroup:
 
     def pause (self) -> None:
         ''' Pause this group's blocking. '''
-        self.state.is_paused = True
+        self.is_paused = True
         self.update_state()
 
     def unpause (self) -> None:
         ''' Unpause this group's blocking. '''
-        self.state.is_paused = False
+        self.is_paused = False
         self.update_state()
 
     def schedule_constraints_consistent (self) -> bool:
