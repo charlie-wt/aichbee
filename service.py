@@ -12,6 +12,7 @@ from pathlib import Path
 import signal
 
 import blockfile
+from blockgroup import BlockGroup
 import refresh
 import util
 
