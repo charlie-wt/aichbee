@@ -71,8 +71,32 @@ def xdg_base_dir (dirname: str) -> Path:
     return Path.home().joinpath(*xdg_base_dirs[env_var])
 
 
-def state_dir () -> Path:
-    return xdg_base_dir("state") / "aichbee"
+def state_dir (ensure_exists: bool = True, use_xdg: bool = False) -> Path:
+    '''
+    A standard location for state.
+
+    Since the service needs to run as root to edit system files, this will be set to a
+    non-user-based location (under ``/opt``) unless ``use_xdg`` is set to ``True`` (in
+    which case ``XDG_STATE_HOME`` will be used).
+
+    ... not the neatest thing.
+
+    :param use_xdg: If True, return an alternative path under $XDG_STATE_HOME;
+                    otherwise, will always return the system location.
+    :param ensure_exists: If ``True``, will make sure the path exists with the right
+                          permissions.
+
+    '''
+
+
+    res = Path("/opt/aichbee/state")
+    if use_xdg:
+        res = xdg_base_dir("state") / "aichbee"
+
+    if ensure_exists:
+        res.mkdir(mode=0o775, parents=True, exist_ok=True)
+
+    return res
 
 
 def config_dir () -> Path:

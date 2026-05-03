@@ -268,7 +268,6 @@ class BlockGroup:
         Note: will raise a ``ValueError`` if this group has no name: any block group
         that needs to save state must have a unique name.
         '''
-        self.state_path().parent.mkdir(mode=0o775, parents=True, exist_ok=True)
         with open(self.state_path(), 'wb') as f:
             pickle.dump(self.state, f)
         os.chmod(self.state_path(), 0o775)
