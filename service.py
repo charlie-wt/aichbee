@@ -24,6 +24,7 @@ A very simple program to set time constraints on websites.
 
 
 WATCHFILE_POLL_RATE_SECONDS: float = 1
+DURATION_UPDATE_RATE_SECONDS: float = 1
 
 
 def parse_args ():
@@ -58,17 +59,17 @@ def main ():
     blocks: list[BlockGroup] = blockfile.read(args.blockfile)
     for b in blocks: logging.debug(b)
 
-    def full_refresh():
-        for group in blocks:
+    def refresh_watchfile_from_groups(groups: list[BlockGroup] | None = None):
+        groups = groups or blocks
+        for group in groups:
             if group.is_blocking():
                 refresh.block(args.watchfile, group)
             else:
                 refresh.unblock(args.watchfile, group)
 
-    full_refresh()
+    refresh_watchfile_from_groups()
 
     start_time = dt.now()
-    # TODO #temp
     for b in blocks:
         if b.duration is not None:
             b.update_state(start_time)
@@ -94,10 +95,10 @@ def main ():
     watchfile_prev_modified_time: float = os.stat(args.watchfile).st_mtime
     watchfile_lock = asyncio.Lock()
 
-    async def locked_refresh():
+    async def locked_refresh_from_groups(groups: list[BlockGroup] | None = None):
         nonlocal watchfile_prev_modified_time
         async with watchfile_lock:
-            full_refresh()
+            refresh_watchfile_from_groups(groups)
             watchfile_prev_modified_time = os.stat(args.watchfile).st_mtime
 
     async def watch_watchfile_for_changes():
@@ -110,21 +111,60 @@ def main ():
             new_time: float = os.stat(args.watchfile).st_mtime
             if new_time != watchfile_prev_modified_time:
                 logging.debug("watchfile changed!")
-                await locked_refresh()
+                await locked_refresh_from_groups()
 
     async def refresh_on_schedule():
         while True:
             now = dt.now()
 
-            next_changes = [group.next_schedule_change(now) for group in blocks]
-            next_changes = [c for c in next_changes if c is not None]
-            next_boundary: dt = min(next_changes)
+            # Get next group to cross a boundary in its schedule constraints, and when
+            # that will be.
+            next_group: BlockGroup | None = None
+            next_boundary: dt | None = None
+            for group in blocks:
+                candidate_boundary: dt = group.next_schedule_change(now)
+                if candidate_boundary is None:
+                    continue
+                if next_boundary is None or next_boundary > candidate_boundary:
+                    next_group = group
+                    next_boundary = candidate_boundary
+
+            if next_group is None or next_boundary is None:
+                continue
             logging.debug(f"next schedule constraint boundary at {next_boundary}")
 
+            # Wait for the boundary, then refresh
             await asyncio.sleep((next_boundary - now).total_seconds())
 
             logging.debug("refreshing from schedule!")
-            await locked_refresh()
+            await locked_refresh_from_groups([next_group])
+
+    was_blocking_last_time: dict[str, bool] = {}
+    async def refresh_on_duration():
+        while True:
+            await asyncio.sleep(DURATION_UPDATE_RATE_SECONDS)
+
+            changed: list[BlockGroup] = []
+
+            any_changes: bool = False
+            now = dt.now()
+            for group in blocks:
+                if group.duration is None:
+                    continue
+
+                group.update_state(now)
+                is_blocking_now = group.is_blocking(now)
+
+                # NOTE: constraint on blockfile parsing means all groups with a duration
+                # constraint should have a name too.
+                last_time = was_blocking_last_time.get(group.canonical_name())
+                if last_time is not None and is_blocking_now != last_time:
+                    changed.append(group)
+
+                was_blocking_last_time[group.canonical_name()] = is_blocking_now
+
+            if changed:
+                await locked_refresh_from_groups(changed)
 
     def parse_group_name_from_message(full_group_name: str) -> BlockGroup | None:
         config_path, group_name = full_group_name.split("::", maxsplit=1)
@@ -134,15 +174,6 @@ def main ():
             return None
 
         return next((g for g in blocks if g.name == group_name), None)
-
-    # TODO #finish
-    # async def enforce_duration(group: BlockGroup):
-    #     remaining = group.duration_remaining()
-    #     assert remaining is not None
-    #     await asyncio.sleep(remaining.total_seconds())
-
-    #     group.update_state()
-    #     await locked_refresh()
 
     async def receive_message(reader: asyncio.StreamReader,
                               writer: asyncio.StreamWriter,
@@ -165,12 +196,11 @@ def main ():
                 return
 
             if args[1] == "true":
-                # TODO #finish: create a task to periodically update the state
                 group.pause()
-                await locked_refresh()
+                await locked_refresh_from_groups([group])
             elif args[1] == "false":
                 group.unpause()
-                await locked_refresh()
+                await locked_refresh_from_groups([group])
             else:
                 logging.error(f"Failed to parse is_paused: {args[1]}")
         elif command == "request":
@@ -197,7 +227,7 @@ def main ():
         data = b""
         while not data.endswith(util.MSG_SEPARATOR.encode()):
             new_data = await reader.read(util.SOCKET_RECV_BUFSIZE)
-            # TODO #robustness: does StreamReader.read work the same as socket.recv?
+            # TODO #correctness: does StreamReader.read work the same as socket.recv?
             if not new_data:
                 break
             data += new_data
@@ -222,6 +252,7 @@ def main ():
     # start event loop.
     loop = asyncio.new_event_loop()
     asyncio.ensure_future(refresh_on_schedule(), loop=loop)
+    asyncio.ensure_future(refresh_on_duration(), loop=loop)
     asyncio.ensure_future(watch_watchfile_for_changes(), loop=loop)
     asyncio.ensure_future(message_server(), loop=loop)
 

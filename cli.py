@@ -25,6 +25,7 @@ def request_data(*args: str) -> list[str]:
     response = ""
 
     with socket.socket() as s:
+        # TODO #enhancement: fallback behaviour if service isn't running.
         s.connect(("0.0.0.0", util.NETWORK_PORT))
         s.sendall(util.msg_segments("request", *args))
 
@@ -52,7 +53,10 @@ def groups (bf_path: Path | None = None) -> list[BlockGroup]:
         bf_path = blockfile.get_filename()
     res = blockfile.read(bf_path)
 
+    # For groups with duration constraints, request their paused state from the service.
     for group in res:
+        if group.duration is None:
+            continue
         response = request_data("is_paused", group.canonical_name())
         assert response[0] == group.canonical_name()
         group.is_paused = response[1] == "true"
@@ -117,6 +121,12 @@ def set_paused (group_name: str, paused: bool, bf_path: Path | None = None) -> N
     """ Either pause or unpause a block group, if it's one with a duration-based block.
     """
     to_pause: BlockGroup = get_prefix_group_match(group_name, groups(bf_path=bf_path))
+
+    if to_pause.duration is None:
+        logging.warning("Can only pause block groups with duration constraints, but "
+                        f"'{colour.cyan(str(to_pause.display_name()))}' doesn't have "
+                        "any.")
+        return
 
     send_message("set_paused", to_pause.canonical_name(), str(paused).lower())
 
