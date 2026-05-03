@@ -41,9 +41,9 @@ twitch.tv
 # Duration-based blocks can either be `per` day/week/month, or `each` day/week/month:
 #
 # * *per* means they'll reset after that amount of time since the previous reset (eg.
-#   `per week` will reset every 24×7 hours).
+#   `per week` will reset every 24×7 hours; 1 month = 30 days).
 # * *each* means they'll reset after that quantity ticks over on the calendar (eg. `each
-#   month` will reset when the calendar month has changed).
+#   month` will reset when the calendar month has changed, at midnight on the 1st).
 #
 # Duration-based blocks are activated and deactivated via the CLI.
 <1hr per week

@@ -50,7 +50,7 @@ class DurationPeriod(Enum):
             case DurationPeriod.PER_WEEK:
                 return after_timedelta(weeks=1)
             case DurationPeriod.PER_MONTH:
-                return after_timedelta(months=1)
+                return after_timedelta(days=30)
             # `EACH_x`: get the start of the next `x` after previous reset, at midnight
             case DurationPeriod.EACH_DAY:
                 return midnight(prev_reset.date() + timedelta(days=1))
