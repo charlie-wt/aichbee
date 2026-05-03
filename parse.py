@@ -4,7 +4,7 @@ from datetime import datetime as dt
 import re
 
 from blockgroup import BlockGroup, Duration, DurationPeriod
-from schedule import Time, TimeRange, Weekday
+from schedule import TimeDay, TimeRange, Weekday
 
 
 NAME_PAT = re.compile(r'\s*=\s*(?P<name>.*)\s*')
@@ -17,16 +17,16 @@ def parse_name (line: str) -> str | None:
 
 
 def parse_time_constraint (m: re.Match, group: BlockGroup):
-    start = Time.from_str(time_str=m.group('start_time'))
-    end = Time.from_str(time_str=m.group('end_time'))
+    start = TimeDay.from_str(time_str=m.group('start_time'))
+    end = TimeDay.from_str(time_str=m.group('end_time'))
 
     group.schedule_ranges.append(TimeRange(start, end))
 
 
 def parse_day_constraint (m: re.Match, group: BlockGroup):
-    start = Time.from_str(time_str=m.group('start_time'),
+    start = TimeDay.from_str(time_str=m.group('start_time'),
                           day=Weekday.from_str(m.group('start_day')))
-    end = Time.from_str(time_str=m.group('end_time'),
+    end = TimeDay.from_str(time_str=m.group('end_time'),
                         day=Weekday.from_str(m.group('end_day')))
 
     group.schedule_ranges.append(TimeRange(start, end))

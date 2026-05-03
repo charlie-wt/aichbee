@@ -34,7 +34,7 @@ class Weekday(Enum):
 
 
 @dataclass
-class Time:
+class TimeDay:
     time: dt.time
     day: Weekday | None = None
 
@@ -42,21 +42,21 @@ class Time:
         return f'{self.day.name.title()[:3] + " @ " if self.day else ""}' \
                f'{self.time.strftime("%H:%M")}'
 
-    def from_dt (dtime: dt) -> 'Time':
-        return Time(dt.time(dtime), Weekday.from_dt(dtime))
+    def from_dt (dtime: dt) -> 'TimeDay':
+        return TimeDay(dt.time(dtime), Weekday.from_dt(dtime))
 
-    def now () -> 'Time':
-        return Time.from_dt(dt.now())
+    def now () -> 'TimeDay':
+        return TimeDay.from_dt(dt.now())
 
-    def from_str (time_str: str, day: Weekday | None = None) -> 'Time':
+    def from_str (time_str: str, day: Weekday | None = None) -> 'TimeDay':
         ''' Expects a string of the format hh:mm '''
-        return Time(time=dt.strptime(time_str, '%H:%M').time(), day=day)
+        return TimeDay(time=dt.strptime(time_str, '%H:%M').time(), day=day)
 
 
 @dataclass
 class TimeRange:
-    start: Time
-    end: Time
+    start: TimeDay
+    end: TimeDay
 
     def __post_init__ (self):
         if (self.start.day is None) != (self.end.day is None):
@@ -70,9 +70,9 @@ class TimeRange:
     def time_only (self) -> bool:
         return self.start.day is None
 
-    def within_constraint (self, now: Time) -> bool:
+    def within_range (self, now: TimeDay) -> bool:
         '''
-        Check a ``Time`` against this range as a constraint.
+        Check a ``TimeDay`` against this range (possible wrapping around midnight).
 
         If ``now.day`` is ``None``, but there are day-based constraints, will return
         ``False``.
@@ -122,12 +122,12 @@ class TimeRange:
         If the current date & time is ``now``, get the next time when this schedule
         constraint will switch from blocked to unblocked, or vice versa.
         '''
-        now: Time = Time.from_dt(now_dt)
+        now: TimeDay = TimeDay.from_dt(now_dt)
         assert now.day is not None
 
         def is_next_change_at_end() -> bool:
             ''' Will the next change be at ``self.end``? (As opposed to ``self.start``) '''
-            within: bool = self.within_constraint(now)
+            within: bool = self.within_range(now)
 
             # do we not have to worry about day-level constraints (no constraints, or
             # all on the same day)?
@@ -141,7 +141,7 @@ class TimeRange:
             return (self.start.day <= self.end.day) == within
 
         # Next switch point as a time & weekday
-        candidate_timeday: Time = self.end if is_next_change_at_end() else self.start
+        candidate_timeday: TimeDay = self.end if is_next_change_at_end() else self.start
 
         # Can we ignore the weekday?
         use_time_only: bool = (
@@ -164,7 +164,7 @@ class TimeRange:
         return dt.combine(candidate_date, candidate_timeday.time)
 
 
-def within_constraints (now: Time | None, ranges: list[TimeRange] | TimeRange) -> bool:
+def within_constraints (now: TimeDay | None, ranges: list[TimeRange] | TimeRange) -> bool:
     '''
     Check a time against a set of constraints.
 
@@ -174,9 +174,9 @@ def within_constraints (now: Time | None, ranges: list[TimeRange] | TimeRange) -
 
     '''
 
-    if now is None: now = Time.now()
+    if now is None: now = TimeDay.now()
 
     if not isinstance(ranges, list): ranges = [ranges]
     if len(ranges) == 0: return True
 
-    return any(r.within_constraint(now) for r in ranges)
+    return any(r.within_range(now) for r in ranges)

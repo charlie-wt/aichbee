@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import pickle
 
-from schedule import Time, TimeRange, within_constraints
+from schedule import TimeDay, TimeRange, within_constraints
 import util
 
 
@@ -226,7 +226,7 @@ class BlockGroup:
         if self.duration is not None and len(self.schedule_ranges) == 0:
             return False
 
-        return within_constraints(Time.from_dt(now), self.schedule_ranges)
+        return within_constraints(TimeDay.from_dt(now), self.schedule_ranges)
 
     def next_schedule_change (self, now: dt) -> dt | None:
         ''' If the current date & time is ``now``, get the next time when one of our
