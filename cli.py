@@ -79,7 +79,8 @@ def groups (bf_path: Path | None = None, fail_on_connection_refused: bool = True
     return res
 
 
-def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) -> str:
+def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True,
+                               prefix: str = "", suffix: str = "") -> str:
     """
     Get the name of the given ``group``, suitably coloured based on state &
     ``should_colour`` option.
@@ -101,7 +102,7 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
                 c = colour.red if group.duration_remaining().total_seconds() <= 0 else colour.cyan
                 remaining = c(remaining)
             ret += remaining
-    return ret
+    return prefix + ret + suffix
 
 
 def ls (blocked_filter: bool | None = None,
@@ -130,11 +131,35 @@ def ls (blocked_filter: bool | None = None,
             print(maybe_coloured_group_name(g, should_colour))
 
 
+def show (group_name: str,
+          bf_path: Path | None = None,
+          should_colour: bool = True) -> None:
+    """
+    Command: show information about a particular block group.
+
+    :param group_name: (Prefix of) name of the group to show.
+    :param bf_path: Location of blockfile (else pick a standard default).
+    """
+    gs = groups(bf_path=bf_path, fail_on_connection_refused=False)
+    to_show: BlockGroup = get_prefix_group_match(group_name, gs)
+
+    if not could_read_runtime_info(to_show):
+        logging.warning(f"{colour.yellow('WARNING')}: Couldn't connect to service (are "
+                        "you sure it's running?); will not be able to get runtime "
+                        "status of groups.")
+    print(maybe_coloured_group_name(to_show, should_colour, suffix=":\n"))
+    print(to_show)
+
+
 def get_prefix_group_match (name_prefix: str, groups: list[BlockGroup]) -> BlockGroup:
     """ Like ``utils.get_unique_prefix_match``, but for group names; return the matching
     ``BlockGroup`` itself.
     """
-    group_name = util.get_unique_prefix_match(name_prefix, [g.name for g in groups])
+    try:
+        group_name = util.get_unique_prefix_match(name_prefix, [g.name for g in groups])
+    except ValueError as e:
+        logging.error(f"{colour.red('ERROR')}: {e}")
+        sys.exit(1)
     # Note: get_unique_prefix_match will handle ambiguous match
     return next(g for g in groups if g.name == group_name)
 
@@ -208,6 +233,14 @@ def main ():
         action="store_true",
         help="List only groups currently being blocked (exclusive with --blocked")
 
+    parser_show = subparsers.add_parser(
+        "show",
+        parents=[common_args_parser],
+        help="Show information on a particular block group")
+    parser_show.add_argument(
+        "show_block_group",
+        help="Name of the block group to show.")
+
     parser_pause = subparsers.add_parser(
         "pause",
         parents=[common_args_parser],
@@ -260,6 +293,8 @@ def main ():
                     blocked_filter = False
 
                 ls(blocked_filter, bf_path, should_colour)
+            case 'show':
+                show(args.show_block_group)
             case _:
                 raise NotImplementedError(f"Unhandled command {args.command}.")
     except ConnectionRefusedError:
