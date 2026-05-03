@@ -7,7 +7,6 @@ for an example of the config file syntax, see [example-blockfile](example-blockf
 ## dependencies
 
 * python 3
-	* [inotify_simple](https://pypi.org/project/inotify_simple/)
 * systemd
 
 ## todo

@@ -5,7 +5,6 @@ import asyncio
 from contextlib import contextmanager
 from datetime import datetime as dt
 import functools
-# from inotify_simple import INotify, flags
 import logging
 import os
 from pathlib import Path
@@ -42,8 +41,6 @@ def parse_args ():
 
 
 def main ():
-    # timeout_ms = 30000
-
     args = parse_args()
 
     # setup.
@@ -52,7 +49,6 @@ def main ():
 
     args.watchfile = os.path.abspath(args.watchfile)
     logging.debug(f'watching {args.watchfile}')
-    # watchfile_dir, watchfile_name = os.path.split(args.watchfile)
 
     args.blockfile = str(Path(args.blockfile).resolve())
     logging.debug(f'getting blockfile from {args.blockfile}')
@@ -73,23 +69,6 @@ def main ():
     for b in blocks:
         if b.duration is not None:
             b.update_state(start_time)
-
-    # # configure inotify
-    # inotify = INotify()
-    # watchfile_watch_descriptor: int = inotify.add_watch(watchfile_dir, flags.MODIFY)
-    # # state_watch_descriptor: int = inotify.add_watch(util.state_dir(), flags.MODIFY)
-
-    # @contextmanager
-    # def suspend_watch():
-    #     nonlocal watchfile_watch_descriptor
-    #     nonlocal state_watch_descriptor
-    #     try:
-    #         inotify.rm_watch(watchfile_watch_descriptor)
-    #         # inotify.rm_watch(state_watch_descriptor)
-    #         yield None
-    #     finally:
-    #         watchfile_watch_descriptor = inotify.add_watch(watchfile_dir, flags.MODIFY)
-    #         # state_watch_descriptor = inotify.add_watch(util.state_dir(), flags.MODIFY)
 
     # define event loop tasks.
     watchfile_prev_modified_time: float = os.stat(args.watchfile).st_mtime
