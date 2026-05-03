@@ -14,9 +14,7 @@ for an example of the config file syntax, see [example-blockfile](example-blockf
 
 ### definitely
 
-* on [durational](https://github.com/charlie-wt/aichbee/tree/durational) branch:
-    * cli (inspecting, pausing groups)
-    * duration-based constraints
+* address todos.
 
 ### maybe
 
