@@ -163,13 +163,13 @@ class BlockGroup:
         have one.
         '''
         remaining: timedelta | None = self.duration_remaining()
-
         if remaining is None:
             return None
 
         remaining = max(timedelta(), remaining)  # don't go under 00:00:00
 
-        res: str = f"{remaining} remaining"
+        # (don't print microseconds)
+        res: str = f"{remaining - timedelta(microseconds=remaining.microseconds)} remaining"
 
         if self.state.prev_duration_reset is not None:
             # we can't say when the next reset will be if we've not reset before
