@@ -19,20 +19,33 @@ COULD_NOT_READ_RUNTIME_INFO_ATTR: str = "_cli_could_not_read_runtime_info"
 
 
 def could_read_runtime_info(group: BlockGroup) -> bool:
+    """ Were we able to read runtime info from the running service for this group? """
     return not hasattr(group, COULD_NOT_READ_RUNTIME_INFO_ATTR)
 
 
 def mark_could_not_read_runtime_info(group: BlockGroup) -> None:
+    """ Mark that we could not read runtime info from the running service for this
+    group. If done, later calls to ``could_read_runtime_info`` on ``group`` will return
+    ``False``.
+
+    (Marking is done by injecting an extra property on the ``BlockGroup``.)
+
+    """
     setattr(group, COULD_NOT_READ_RUNTIME_INFO_ATTR, True)
 
 
 def send_message(*args: str) -> None:
+    """ Send a message to the running service. Will error if the service isn't running.
+    """
     with socket.socket() as s:
         s.connect(("0.0.0.0", util.NETWORK_PORT))
         s.sendall(util.msg_segments(*args))
 
 
 def request_data(*args: str) -> list[str]:
+    """ Request some data from the running service, and wait to receive a response
+    before returning it. Will error if the service isn't running.
+    """
     response = ""
 
     with socket.socket() as s:

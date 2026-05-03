@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import pickle
 
-from schedule import next_change_time, Time, TimeRange, within_constraints
+from schedule import Time, TimeRange, within_constraints
 import util
 
 
@@ -123,7 +123,11 @@ class BlockGroup:
 
     def canonical_name (self) -> str:
         ''' Get a name that should (hopefully) be unique even if we've run aichbee with
-        different configurations. '''
+        different configurations.
+
+        Note that if this group has no ``name``, this function *won't* try to generate a
+        unique identifier for it.
+        '''
         return str(self.config_path.resolve()) + "::" + self.name
 
     def state_filename (self) -> str:
@@ -211,6 +215,10 @@ class BlockGroup:
     def within_schedule_constraints (self, now: dt) -> bool:
         ''' If the current time is ``now``, do the group's schedule constraints say the
         blocks should be applied?
+
+        Note that if we have *no* schedule constraints, this will always return ``True``
+        ('always block') unless we have a duration constraint, in which case it will
+        always return ``False`` ('only block based on duration constraint').
         '''
 
         # If we have *just* a duration constraint, then we should never constrain based
@@ -228,7 +236,7 @@ class BlockGroup:
         '''
         if len(self.schedule_ranges) == 0:
             return None
-        return min(next_change_time(now, r) for r in self.schedule_ranges)
+        return min(r.next_change_time(now) for r in self.schedule_ranges)
 
     def update_state (self, now: dt | None = None) -> None:
         ''' Update this group's ``state`` assuming the current time is now ``now``, and
