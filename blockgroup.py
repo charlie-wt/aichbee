@@ -55,8 +55,9 @@ class DurationPeriod(Enum):
             case DurationPeriod.EACH_DAY:
                 return midnight(prev_reset.date() + timedelta(days=1))
             case DurationPeriod.EACH_WEEK:
-                # TODO #test
-                return midnight(prev_reset.date() + timedelta(weeks=1))
+                return midnight(
+                    prev_reset.date() + timedelta(days=(7 - prev_reset.weekday()))
+                )
             case DurationPeriod.EACH_MONTH:
                 return midnight(
                     (prev_reset.replace(day=1) + timedelta(days=32)).replace(day=1).date()
