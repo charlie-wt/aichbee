@@ -271,6 +271,7 @@ class BlockGroup:
         self.state_path().parent.mkdir(mode=0o775, parents=True, exist_ok=True)
         with open(self.state_path(), 'wb') as f:
             pickle.dump(self.state, f)
+        os.chmod(self.state_path(), 0o775)
 
     def load_state (self) -> None:
         ''' Load duration-constraint state from this group's standardised file.
@@ -345,9 +346,19 @@ class BlockGroup:
         else:
             res += f'\t\t{self.duration}\n'
 
-        # TODO #enhancement: ellipsise
+        # Ellipsise the list of sites if it's too long (unless we're printing verbosely)
+        max_sites_to_list: int = 10
+        sites_to_list: list[str] = self.sites
+        if (
+            len(sites_to_list) > max_sites_to_list and
+            logging.root.level >= logging.DEBUG
+        ):
+            sites_to_list = self.sites[:max_sites_to_list // 2]
+            sites_to_list.append(f"... {len(self.sites) - max_sites_to_list} more sites ...")
+            sites_to_list.extend(self.sites[-(max_sites_to_list // 2 + 1):-1])
+
         res += '\tSites to block:\n'
-        for s in self.sites:
+        for s in sites_to_list:
             res += f'\t\t{s}\n'
 
         return res

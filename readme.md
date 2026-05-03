@@ -13,7 +13,7 @@ for an example of the config file syntax, see [example-blockfile](example-blockf
 
 ### definitely
 
-* address todos.
+* address any todos.
 
 ### maybe
 

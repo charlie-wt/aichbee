@@ -15,6 +15,17 @@ from blockgroup import BlockGroup
 import util
 
 
+COULD_NOT_READ_RUNTIME_INFO_ATTR: str = "_cli_could_not_read_runtime_info"
+
+
+def could_read_runtime_info(group: BlockGroup) -> bool:
+    return not hasattr(group, COULD_NOT_READ_RUNTIME_INFO_ATTR)
+
+
+def mark_could_not_read_runtime_info(group: BlockGroup) -> None:
+    setattr(group, COULD_NOT_READ_RUNTIME_INFO_ATTR, True)
+
+
 def send_message(*args: str) -> None:
     with socket.socket() as s:
         s.connect(("0.0.0.0", util.NETWORK_PORT))
@@ -25,7 +36,6 @@ def request_data(*args: str) -> list[str]:
     response = ""
 
     with socket.socket() as s:
-        # TODO #enhancement: fallback behaviour if service isn't running.
         s.connect(("0.0.0.0", util.NETWORK_PORT))
         s.sendall(util.msg_segments("request", *args))
 
@@ -42,7 +52,7 @@ def request_data(*args: str) -> list[str]:
 
 
 @functools.cache
-def groups (bf_path: Path | None = None) -> list[BlockGroup]:
+def groups (bf_path: Path | None = None, fail_on_connection_refused: bool = True) -> list[BlockGroup]:
     """
     Get all the block groups from a detected standard blockfile location, in the order
     in which they appear in the file.
@@ -57,9 +67,14 @@ def groups (bf_path: Path | None = None) -> list[BlockGroup]:
     for group in res:
         if group.duration is None:
             continue
-        response = request_data("is_paused", group.canonical_name())
-        assert response[0] == group.canonical_name()
-        group.is_paused = response[1] == "true"
+        try:
+            response = request_data("is_paused", group.canonical_name())
+            assert response[0] == group.canonical_name()
+            group.is_paused = response[1] == "true"
+        except ConnectionRefusedError as e:
+            if fail_on_connection_refused:
+                raise e
+            mark_could_not_read_runtime_info(group)
 
     return res
 
@@ -74,7 +89,9 @@ def maybe_coloured_group_name (group: BlockGroup, should_colour: bool = True) ->
         if not group.is_blocking():
             ret = colour.grey(ret)
 
-        if group.is_paused:
+        if not could_read_runtime_info(group):
+            ret = ret + colour.yellow(" (paused status unknown)")
+        elif group.is_paused:
             ret = colour.yellow("(paused) ") + ret
 
         remaining = group.duration_summary()
@@ -99,7 +116,12 @@ def ls (blocked_filter: bool | None = None,
     :param bf_path: Location of blockfile (else pick a standard default).
     """
     names: list[str] = []
-    for g in groups(bf_path=bf_path):
+    gs = groups(bf_path=bf_path, fail_on_connection_refused=False)
+    if any(not could_read_runtime_info(g) for g in gs):
+        logging.warning(f"{colour.yellow('WARNING')}: Couldn't connect to service (are "
+                        "you sure it's running?); will not be able to get runtime "
+                        "status of groups.")
+    for g in gs:
         if blocked_filter == True and g.is_blocking():
             print(maybe_coloured_group_name(g, should_colour))
         elif blocked_filter == False and not g.is_blocking():
@@ -131,7 +153,11 @@ def set_paused (group_name: str, paused: bool, bf_path: Path | None = None) -> N
     send_message("set_paused", to_pause.canonical_name(), str(paused).lower())
 
     to_pause.is_paused = paused
-    to_pause.load_state()  # TODO #robustness: might be too quick for the service's update (maybe fine if it's updating quick enough anyway)
+
+    # try and get more up-to-date state, after waiting a bit for messages to go through
+    _ = request_data("is_paused", to_pause.canonical_name())
+    to_pause.load_state()
+
     logging.warning(maybe_coloured_group_name(to_pause, True))
 
 
@@ -219,22 +245,27 @@ def main ():
     if bf_path is not None:
         bf_path = Path(bf_path)
 
-    # parse subcommands
-    match args.command:
-        case 'pause':
-            pause(args.pause_block_group, bf_path)
-        case 'unpause':
-            unpause(args.unpause_block_group, bf_path)
-        case 'list':
-            blocked_filter: bool | None = None
-            if args.blocked:
-                blocked_filter = True
-            if args.unblocked:
-                blocked_filter = False
+    try:
+        # parse subcommands
+        match args.command:
+            case 'pause':
+                pause(args.pause_block_group, bf_path)
+            case 'unpause':
+                unpause(args.unpause_block_group, bf_path)
+            case 'list':
+                blocked_filter: bool | None = None
+                if args.blocked:
+                    blocked_filter = True
+                if args.unblocked:
+                    blocked_filter = False
 
-            ls(blocked_filter, bf_path, should_colour)
-        case _:
-            raise NotImplementedError(f"Unhandled command {args.command}.")
+                ls(blocked_filter, bf_path, should_colour)
+            case _:
+                raise NotImplementedError(f"Unhandled command {args.command}.")
+    except ConnectionRefusedError:
+        logging.error(f"{colour.red('ERROR')}: connection to service refused. Are you "
+                      "sure the service is running?")
+        sys.exit(1)
 
 
 if __name__ == '__main__':

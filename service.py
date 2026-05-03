@@ -206,8 +206,7 @@ def main ():
         data = b""
         while not data.endswith(util.MSG_SEPARATOR.encode()):
             new_data = await reader.read(util.SOCKET_RECV_BUFSIZE)
-            # TODO #correctness: does StreamReader.read work the same as socket.recv?
-            if not new_data:
+            if not new_data:  # empty bytes object => eof received
                 break
             data += new_data
 
