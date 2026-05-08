@@ -248,20 +248,20 @@ class BlockGroup:
         if now is None:
             now = dt.now()
 
+        if (
+            self.state.prev_duration_reset is None or
+            self.state.time_spent_paused is None or
+            self.duration.period.ready_to_reset(self.state.prev_duration_reset, now)
+        ):
+            self.state.reset_duration(now, self.duration)
+
         if self.is_paused:
             # Update paused duration, only if we're also outside schedule constraints.
-            if not self.within_schedule_constraints(now):
-                if (
-                    self.state.prev_duration_reset is None or
-                    self.state.time_spent_paused is None or
-                    self.duration.period.ready_to_reset(self.state.prev_duration_reset,
-                                                        now)
-                ):
-                    self.state.reset_duration(now, self.duration)
-
-                if self.prev_time_spent_paused_update is not None:
-                    to_add: timedelta = now - self.prev_time_spent_paused_update
-                    self.state.time_spent_paused += to_add
+            if (
+                not self.within_schedule_constraints(now) and
+                self.prev_time_spent_paused_update is not None
+            ):
+                self.state.time_spent_paused += now - self.prev_time_spent_paused_update
 
             # If we run out of time while paused, then automatically unpause.
             if self.within_duration_constraints(now):
