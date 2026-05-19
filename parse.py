@@ -7,27 +7,29 @@ from blockgroup import BlockGroup, Duration, DurationPeriod
 from schedule import TimeDay, TimeRange, Weekday
 
 
-NAME_PAT = re.compile(r'\s*=\s*(?P<name>.*)\s*')
+NAME_PAT = re.compile(r"\s*=\s*(?P<name>.*)\s*")
 
 
-def parse_name (line: str) -> str | None:
+def parse_name(line: str) -> str | None:
     if m := re.match(NAME_PAT, line):
-        return m.group('name')
+        return m.group("name")
     return None
 
 
-def parse_time_constraint (m: re.Match, group: BlockGroup):
-    start = TimeDay.from_str(time_str=m.group('start_time'))
-    end = TimeDay.from_str(time_str=m.group('end_time'))
+def parse_time_constraint(m: re.Match, group: BlockGroup):
+    start = TimeDay.from_str(time_str=m.group("start_time"))
+    end = TimeDay.from_str(time_str=m.group("end_time"))
 
     group.schedule_ranges.append(TimeRange(start, end))
 
 
-def parse_day_constraint (m: re.Match, group: BlockGroup):
-    start = TimeDay.from_str(time_str=m.group('start_time'),
-                          day=Weekday.from_str(m.group('start_day')))
-    end = TimeDay.from_str(time_str=m.group('end_time'),
-                        day=Weekday.from_str(m.group('end_day')))
+def parse_day_constraint(m: re.Match, group: BlockGroup):
+    start = TimeDay.from_str(
+        time_str=m.group("start_time"), day=Weekday.from_str(m.group("start_day"))
+    )
+    end = TimeDay.from_str(
+        time_str=m.group("end_time"), day=Weekday.from_str(m.group("end_day"))
+    )
 
     group.schedule_ranges.append(TimeRange(start, end))
 
@@ -39,54 +41,70 @@ class LineType:
 
 
 SCHEDULE_HANDLERS = [
-    LineType(re.compile(r'\s*@\s*'
-                        r'(?P<start_time>\d\d:\d\d)\s*-\s*'
-                        r'(?P<end_time>\d\d:\d\d)\s*'),
-             parse_time_constraint),
-    LineType(re.compile(r'\s*@\s*'
-                        r'(?P<start_day>\w+)\s*'
-                        r'(?P<start_time>\d\d:\d\d)\s*-\s*'
-                        r'(?P<end_day>\w+)\s*'
-                        r'(?P<end_time>\d\d:\d\d)\s*'),
-             parse_day_constraint),
+    LineType(
+        re.compile(
+            r"\s*@\s*"
+            r"(?P<start_time>\d\d:\d\d)\s*-\s*"
+            r"(?P<end_time>\d\d:\d\d)\s*"
+        ),
+        parse_time_constraint,
+    ),
+    LineType(
+        re.compile(
+            r"\s*@\s*"
+            r"(?P<start_day>\w+)\s*"
+            r"(?P<start_time>\d\d:\d\d)\s*-\s*"
+            r"(?P<end_day>\w+)\s*"
+            r"(?P<end_time>\d\d:\d\d)\s*"
+        ),
+        parse_day_constraint,
+    ),
 ]
 
 
-def parse_schedule_constraint (line: str, group: BlockGroup) -> None:
-    ''' Add the parsed schedule-constraint line ``line`` to BlockGroup ``group``, or
+def parse_schedule_constraint(line: str, group: BlockGroup) -> None:
+    """Add the parsed schedule-constraint line ``line`` to BlockGroup ``group``, or
     raise a ``ValueError``.
-    '''
+    """
     for h in SCHEDULE_HANDLERS:
         if m := re.match(h.regex, line):
             h.handler(m, group)
             return
-    raise ValueError(f"Block group {group.display_name()}: couldn't parse blockfile "
-                     f"line: '{line}'")
+    raise ValueError(
+        f"Block group {group.display_name()}: couldn't parse blockfile line: '{line}'"
+    )
 
 
-DURATION_PAT = re.compile(r'<(?P<length>\d+\.?\d*)hrs?\s+(?P<mode>per|each)\s+(?P<period>\w+)')
+DURATION_PAT = re.compile(
+    r"<(?P<length>\d+\.?\d*)hrs?\s+(?P<mode>per|each)\s+(?P<period>\w+)"
+)
 
 
-def parse_duration_constraint (line: str, group: BlockGroup) -> None:
-    ''' Add the parsed duration-constraint line ``line`` to BlockGroup ``group``, or
+def parse_duration_constraint(line: str, group: BlockGroup) -> None:
+    """Add the parsed duration-constraint line ``line`` to BlockGroup ``group``, or
     raise a ``ValueError``.
-    '''
+    """
     if group.duration is not None:
-        raise ValueError("Can only have one duration-based constraint per block "
-                         "group, but tried to parse multiple on "
-                         f"{group.display_name()}.")
+        raise ValueError(
+            "Can only have one duration-based constraint per block group, but tried to "
+            f"parse multiple on {group.display_name()}."
+        )
 
     if group.name is None:
-        raise ValueError("Tried to parse a duration in an unnamed block group. Any "
-                         "block group with a duration-based constraint must have a "
-                         "unique name, in order to save its state.")
+        raise ValueError(
+            "Tried to parse a duration in an unnamed block group. Any block group with "
+            "a duration-based constraint must have a unique name, in order to save its "
+            "state."
+        )
 
     m = re.match(DURATION_PAT, line)
     if m is None:
-        raise ValueError(f"Block group {group.display_name()}: couldn't parse "
-                         f"blockfile line: '{line}'")
+        raise ValueError(
+            f"Block group {group.display_name()}: couldn't parse blockfile line: "
+            f"'{line}'"
+        )
 
     group.duration = Duration(
         DurationPeriod.from_str(f"{m.group('mode')}_{m.group('period')}"),
-        float(m.group("length"))
+        float(m.group("length")),
     )

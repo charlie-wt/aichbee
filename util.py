@@ -3,11 +3,13 @@ from enum import Enum
 import os
 
 
-def get_unique_prefix_match(prefix: str,
-                            choices: list[str],
-                            case_sensitive: bool = False,
-                            category_name: str = "value") -> str:
-    '''
+def get_unique_prefix_match(
+    prefix: str,
+    choices: list[str],
+    case_sensitive: bool = False,
+    category_name: str = "value",
+) -> str:
+    """
     Try to find a single element of ``choices`` for which ``prefix`` is a prefix.
 
     If more than one element matches, or none do, will raise a ``ValueError``.
@@ -18,7 +20,7 @@ def get_unique_prefix_match(prefix: str,
     :param category_name: A human readable name for what a value in ``choices``
                           represents, for error messages: eg. if ``choices`` is the days
                           of the week, ``category_name`` would be ``"weekday"``.
-    '''
+    """
 
     if not case_sensitive:
         prefix = prefix.lower()
@@ -33,26 +35,28 @@ def get_unique_prefix_match(prefix: str,
     allowed_values_str = ", ".join(allowed_values[:-1])
     allowed_values_str += f" and {allowed_values[-1]}"
 
-    raise ValueError(f"Couldn't parse a unique {category_name} from the prefix "
-                     f"'{prefix}' (had {len(results)} matches). Allowed values are "
-                     f"{allowed_values_str}.")
+    raise ValueError(
+        f"Couldn't parse a unique {category_name} from the prefix '{prefix}' (had "
+        f"{len(results)} matches). Allowed values are {allowed_values_str}."
+    )
 
 
-def get_unique_enum_prefix_match(prefix: str,
-                                 enum: Enum,
-                                 case_sensitive: bool = False,
-                                 value_name: str = "value") -> Enum:
-    '''
+def get_unique_enum_prefix_match(
+    prefix: str, enum: Enum, case_sensitive: bool = False, value_name: str = "value"
+) -> Enum:
+    """
     Like ``get_unique_prefix_match``, but take the choices from the names of an
     ``Enum``'s values and return the matching instance of the ``Enum`` class.
 
     :param value_name: A human readable name for what a value from ``enum`` represents,
                        for error messages.
-    '''
-    res_name: str = get_unique_prefix_match(prefix,
-                                            [p.name for p in enum],
-                                            case_sensitive=case_sensitive,
-                                            category_name=value_name)
+    """
+    res_name: str = get_unique_prefix_match(
+        prefix,
+        [p.name for p in enum],
+        case_sensitive=case_sensitive,
+        category_name=value_name,
+    )
     return enum._member_map_[res_name.upper()]
 
 
@@ -61,7 +65,8 @@ xdg_base_dirs = {
     "XDG_STATE_HOME": [".local", "state"],
 }
 
-def xdg_base_dir (dirname: str) -> Path:
+
+def xdg_base_dir(dirname: str) -> Path:
     env_var = f"XDG_{dirname.upper()}_HOME"
 
     value = os.environ.get(env_var)
@@ -71,23 +76,22 @@ def xdg_base_dir (dirname: str) -> Path:
     return Path.home().joinpath(*xdg_base_dirs[env_var])
 
 
-def state_dir (ensure_exists: bool = True, use_xdg: bool = False) -> Path:
-    '''
+def state_dir(ensure_exists: bool = True, use_xdg: bool = False) -> Path:
+    """
     A standard location for state.
 
     Since the service needs to run as root to edit system files, this will be set to a
     non-user-based location (under ``/opt``) unless ``use_xdg`` is set to ``True`` (in
-    which case ``XDG_STATE_HOME`` will be used).
+    which case ``$XDG_STATE_HOME`` will be used).
 
     ... not the neatest thing.
 
-    :param use_xdg: If True, return an alternative path under $XDG_STATE_HOME;
+    :param use_xdg: If True, return an alternative path under ``$XDG_STATE_HOME``;
                     otherwise, will always return the system location.
     :param ensure_exists: If ``True``, will make sure the path exists with the right
                           permissions.
 
-    '''
-
+    """
 
     res = Path("/opt/aichbee/state")
     if use_xdg:
@@ -99,7 +103,7 @@ def state_dir (ensure_exists: bool = True, use_xdg: bool = False) -> Path:
     return res
 
 
-def config_dir () -> Path:
+def config_dir() -> Path:
     return xdg_base_dir("config") / "aichbee"
 
 
@@ -109,6 +113,7 @@ SOCKET_RECV_BUFSIZE: int = 2**16
 
 MSG_SEPARATOR: str = "\n"
 MSG_SEGMENT_SEPARATOR: str = "\t"
+
 
 def msg_segments(*args: str) -> bytes:
     return (MSG_SEGMENT_SEPARATOR.join(args) + MSG_SEPARATOR).encode()

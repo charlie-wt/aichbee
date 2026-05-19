@@ -16,44 +16,55 @@ import refresh
 import util
 
 
-'''
+"""
 A very simple program to set time constraints on websites.
 
-'''
+"""
 
 
 WATCHFILE_POLL_RATE_SECONDS: float = 1
 DURATION_UPDATE_RATE_SECONDS: float = 1
 
 
-def parse_args ():
+def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-w', '--watchfile',
-                        default=os.path.abspath(os.path.join(os.path.sep, 'etc', 'hosts')),
-                        help='Path to file to watch & manage (eg. hosts).')
-    parser.add_argument('-b', '--blockfile',
-                        default=str(blockfile.get_filename()),
-                        help='Path to blockfile to enforce.')
-    parser.add_argument('-v', '--verbose',
-                        action='store_true',
-                        help='Whether to log some extra messages to stdout.')
+    parser.add_argument(
+        "-w",
+        "--watchfile",
+        default=os.path.abspath(os.path.join(os.path.sep, "etc", "hosts")),
+        help="Path to file to watch & manage (eg. hosts).",
+    )
+    parser.add_argument(
+        "-b",
+        "--blockfile",
+        default=str(blockfile.get_filename()),
+        help="Path to blockfile to enforce.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Whether to log some extra messages to stdout.",
+    )
     return parser.parse_args()
 
 
-def main ():
+def main():
     args = parse_args()
 
-    # setup.
-    logging.basicConfig(format='%(message)s',
-                        level='NOTSET' if args.verbose else 'WARNING')
+    # Setup.
+    logging.basicConfig(
+        format="%(message)s", level="NOTSET" if args.verbose else "WARNING"
+    )
 
     args.watchfile = os.path.abspath(args.watchfile)
-    logging.debug(f'watching {args.watchfile}')
+    logging.debug(f"watching {args.watchfile}")
 
     args.blockfile = str(Path(args.blockfile).resolve())
-    logging.debug(f'getting blockfile from {args.blockfile}')
+    logging.debug(f"getting blockfile from {args.blockfile}")
     blocks: list[BlockGroup] = blockfile.read(args.blockfile)
-    for b in blocks: logging.debug(b)
+    for b in blocks:
+        logging.debug(b)
 
     def refresh_watchfile_from_groups(groups: list[BlockGroup] | None = None):
         groups = groups or blocks
@@ -70,7 +81,7 @@ def main ():
         if b.duration is not None:
             b.update_state(start_time)
 
-    # define event loop tasks.
+    # Define event loop tasks.
     watchfile_prev_modified_time: float = os.stat(args.watchfile).st_mtime
     watchfile_lock = asyncio.Lock()
 
@@ -112,13 +123,14 @@ def main ():
                 continue
             logging.debug(f"next schedule constraint boundary at {next_boundary}")
 
-            # Wait for the boundary, then refresh
+            # Wait for the boundary, then refresh.
             await asyncio.sleep((next_boundary - now).total_seconds())
 
             logging.debug("refreshing from schedule!")
             await locked_refresh_from_groups([next_group])
 
     was_blocking_last_time: dict[str, bool] = {}
+
     async def refresh_on_duration():
         while True:
             await asyncio.sleep(DURATION_UPDATE_RATE_SECONDS)
@@ -154,16 +166,16 @@ def main ():
 
         return next((g for g in blocks if g.name == group_name), None)
 
-    async def receive_message(reader: asyncio.StreamReader,
-                              writer: asyncio.StreamWriter,
-                              message: list[str]):
+    async def receive_message(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter, message: list[str]
+    ):
         command, *args = message
 
         if command == "set_paused":
             if len(args) != 2:
                 logging.error(
-                    "Expected 2 args for 'set_paused' message (canonical group "
-                    f"name + is_paused), but got {len(args)}"
+                    "Expected 2 args for 'set_paused' message (canonical group name + "
+                    f"is_paused), but got {len(args)}"
                 )
                 return
             group: BlockGroup = parse_group_name_from_message(args[0])
@@ -194,19 +206,22 @@ def main ():
                 writer.write(util.msg_segments(*response))
                 await writer.drain()
             else:
-                writer.write(util.msg_segments("error", f"unknown request type {args[0]}"))
+                writer.write(
+                    util.msg_segments("error", f"unknown request type {args[0]}")
+                )
                 await writer.drain()
         else:
             writer.write(util.msg_segments("error", f"unknown command {command}"))
             await writer.drain()
 
-    async def client_connected(reader: asyncio.StreamReader,
-                               writer: asyncio.StreamWriter):
+    async def client_connected(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
         # Try to read until we've got a full message.
         data = b""
         while not data.endswith(util.MSG_SEPARATOR.encode()):
             new_data = await reader.read(util.SOCKET_RECV_BUFSIZE)
-            if not new_data:  # empty bytes object => eof received
+            if not new_data:  # Empty bytes object => eof received.
                 break
             data += new_data
 
@@ -222,37 +237,38 @@ def main ():
 
     async def message_server():
         server = await asyncio.start_server(
-            client_connected, "0.0.0.0", util.NETWORK_PORT)
+            client_connected, "0.0.0.0", util.NETWORK_PORT
+        )
 
         async with server:
             await server.serve_forever()
 
-    # start event loop.
+    # Start event loop.
     loop = asyncio.new_event_loop()
     asyncio.ensure_future(refresh_on_schedule(), loop=loop)
     asyncio.ensure_future(refresh_on_duration(), loop=loop)
     asyncio.ensure_future(watch_watchfile_for_changes(), loop=loop)
     asyncio.ensure_future(message_server(), loop=loop)
 
-    # handle signals to stop cleanly.
-    if hasattr(signal, 'SIGINT'):
+    # Handle signals to stop cleanly.
+    if hasattr(signal, "SIGINT"):
         loop.add_signal_handler(signal.SIGINT, loop.stop)
-    if hasattr(signal, 'SIGTERM'):
+    if hasattr(signal, "SIGTERM"):
         loop.add_signal_handler(signal.SIGTERM, loop.stop)
 
     try:
-        # run the event loop. hit ctrl-c to stop.
+        # Run the event loop. hit ctrl-c to stop.
         loop.run_forever()
     finally:
-        # cleanup.
+        # Cleanup.
         pending = asyncio.all_tasks(loop)
         for task in pending:
             task.cancel()
 
-        # run the loop briefly to allow cancelled tasks to finish their cleanup.
+        # Run the loop briefly to allow cancelled tasks to finish their cleanup.
         loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
         loop.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

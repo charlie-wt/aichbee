@@ -7,7 +7,8 @@ from blockgroup import BlockGroup
 
 
 class BlockedState(Enum):
-    ''' The state of a given blocked site in the watched file (ie. `hosts`). '''
+    """The state of a given blocked site in the watched file (ie. `hosts`)."""
+
     BLOCKED = auto()
     COMMENTED = auto()
     ABSENT = auto()
@@ -15,38 +16,38 @@ class BlockedState(Enum):
 
 @functools.cache
 def site_regex(site: str) -> re.Pattern:
-    return re.compile(r'\s*(?P<comment_char>#\s*)?0.0.0.0\s+' + site)
+    return re.compile(r"\s*(?P<comment_char>#\s*)?0.0.0.0\s+" + site)
 
 
 def line_match(site: str, watchfile_line: str) -> BlockedState:
     if m := site_regex(site).match(watchfile_line):
-        if m.group('comment_char') is None:
+        if m.group("comment_char") is None:
             return BlockedState.BLOCKED
         return BlockedState.COMMENTED
     return BlockedState.ABSENT
 
 
-def blocked_state (site: str, watchfile_lines: list[str]) -> (BlockedState, list[int]):
-    '''
-    Get the state of the given site, within the given 'watch file' lines (eg. those
-    of `hosts`)
+def blocked_state(site: str, watchfile_lines: list[str]) -> (BlockedState, list[int]):
+    """
+    Get the state of the given site, within the given 'watch file' lines (eg. those of
+    ``hosts``).
 
-    '''
+    """
 
     blocked_lines = []
     commented_lines = []
 
-    # get the lines of `watchfile_lines` that contain (un)commented entries for `site`
+    # Get the lines of `watchfile_lines` that contain (un)commented entries for `site`.
     for i, line in enumerate(watchfile_lines):
         state = line_match(site, line)
 
         if state == BlockedState.BLOCKED:
             blocked_lines.append(i)
-            # can't break, as the site may be in the file multiple times
+            # Can't break, as the site may be in the file multiple times.
         elif state == BlockedState.COMMENTED:
             commented_lines.append(i)
 
-    # return list of line numbers based on blocked status of `site`.
+    # Return list of line numbers based on blocked status of `site`.
     if blocked_lines:
         return (BlockedState.BLOCKED, blocked_lines)
     elif commented_lines:
@@ -54,84 +55,87 @@ def blocked_state (site: str, watchfile_lines: list[str]) -> (BlockedState, list
     return (BlockedState.ABSENT, [])
 
 
-def block (filename: str, blocks: list[BlockGroup] | BlockGroup):
-    ''' Main function to correct the hosts file. '''
-    if not isinstance(blocks, list): blocks = [blocks]
+def block(filename: str, blocks: list[BlockGroup] | BlockGroup):
+    """Main function to correct the hosts file."""
+    if not isinstance(blocks, list):
+        blocks = [blocks]
 
-    # get the data from the file
-    with open(filename, 'r') as f:
+    # Get the data from the file.
+    with open(filename, "r") as f:
         data = f.readlines()
     newdata = data[:]
 
     for group in blocks:
-        logging.debug(f'group {group.display_name()}:')
+        logging.debug(f"group {group.display_name()}:")
 
         if not group.is_blocking():
             logging.debug("\tshouldn't be blocking right now")
             continue
 
-        # this site should be blocked -- construct lines of new file
+        # This site should be blocked -- construct lines of new file.
         for site in group.sites:
             state, lines = blocked_state(site, data)
 
-            # site is already blocked
+            # Site is already blocked.
             if state == BlockedState.BLOCKED:
                 continue
 
-            entry = f'0.0.0.0\t{site}\n'
+            entry = f"0.0.0.0\t{site}\n"
 
-            # site is commented out -- uncomment
+            # Site is commented out -- uncomment.
             if state == BlockedState.COMMENTED:
-                logging.debug(f'\t{entry[:-1]} is commented on lines {lines}')
+                logging.debug(f"\t{entry[:-1]} is commented on lines {lines}")
                 for l in lines:
                     newdata[l] = entry
                 continue
 
-            # site is absent -- add
-            logging.debug(f'\t{entry[:-1]} is missing')
+            # Site is absent -- add.
+            logging.debug(f"\t{entry[:-1]} is missing")
             newdata.append(entry)
 
     if data == newdata:
-        # file has not changed - don't bother writing
-        logging.debug('-- nothing to update; don\'t write watched file')
+        # File has not changed - don't bother writing.
+        logging.debug("-- nothing to update; don't write watched file")
     else:
-        # update the file
-        with open(filename, 'w') as f:
+        # Update the file.
+        with open(filename, "w") as f:
             f.writelines(newdata)
-        logging.debug('-- written updated watched file')
+        logging.debug("-- written updated watched file")
 
 
-def unblock (filename: str, blocks: list[BlockGroup] | BlockGroup):
-    '''
-    Unblock all websites in the blocks, applied one-by-one. To be used after
-    a schedule finishes.
+def unblock(filename: str, blocks: list[BlockGroup] | BlockGroup):
+    """
+    Unblock all websites in the blocks, applied one-by-one. To be used after a schedule
+    finishes.
 
-    '''
-    if not isinstance(blocks, list): blocks = [blocks]
+    """
+    if not isinstance(blocks, list):
+        blocks = [blocks]
 
-    # get the data from the file
-    with open(filename, 'r') as f:
+    # Get the data from the file.
+    with open(filename, "r") as f:
         data = f.readlines()
     newdata = data[:]
 
     for group in blocks:
-        logging.debug(f'unblocking group {group.display_name()}:')
+        logging.debug(f"unblocking group {group.display_name()}:")
 
-        # construct lines of new file
-        blockentries = [ f'#0.0.0.0\t{i}\n' for i in group.sites ]
+        # Construct lines of new file.
+        blockentries = [f"#0.0.0.0\t{i}\n" for i in group.sites]
         for entry in blockentries:
             if entry not in data:
                 if entry[1:] in data:
-                    # comment the line
-                    logging.debug(f'\t{entry[1:-1]} is active at line '
-                                  f'{data.index(entry[1:])}')
+                    # Comment the line.
+                    logging.debug(
+                        f"\t{entry[1:-1]} is active at line {data.index(entry[1:])}"
+                    )
                     newdata[data.index(entry[1:])] = entry
 
     if data == newdata:
-        # file has not changed - don't bother writing
-        logging.debug('-- nothing\'s changed!')
+        # File has not changed - don't bother writing.
+        logging.debug("-- nothing's changed!")
     else:
-        # update the file
-        with open(filename, 'w') as f:
+        # Update the file.
+        with open(filename, "w") as f:
             f.writelines(newdata)
-        logging.debug('-- unblocked')
+        logging.debug("-- unblocked")
