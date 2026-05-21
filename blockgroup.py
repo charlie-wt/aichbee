@@ -85,20 +85,27 @@ class Duration:
 
     period: DurationPeriod
     length_hours: float
+    max_pauses: int = 0  # `0` means unlimited pauses
 
     def __str__(self) -> str:
-        maybe_plural = "s" if self.length_hours != 1 else ""
-        return f"{self.length_hours} hour{maybe_plural} per {self.period.name.lower()}"
+        length_plural = "s" if self.length_hours != 1 else ""
+        res = f"{self.length_hours} hour{length_plural} per {self.period.name.lower()}"
+        if self.max_pauses > 0:
+            pauses_plural = "s" if self.max_pauses != 1 else ""
+            res += f", with {self.max_pauses} pause{pauses_plural}"
+        return res
 
 
 @dataclass
 class State:
     prev_duration_reset: dt | None = None
     time_spent_paused: timedelta | None = None
+    num_pauses: int | None = None
 
     def reset_duration(self, now: dt, duration: Duration) -> None:
         self.prev_duration_reset = now
         self.time_spent_paused = timedelta()
+        self.num_pauses = 0
 
 
 @dataclass
@@ -166,6 +173,21 @@ class BlockGroup:
 
         return timedelta(hours=self.duration.length_hours) - spent_paused
 
+    def pauses_remaining(self) -> int | None:
+        """Get the number of pauses remaining on our duration-based constraint, if we
+        have one with a limited number.
+        """
+        if self.duration is None:
+            return None
+
+        if self.duration.max_pauses < 1:
+            return None
+
+        if self.state.num_pauses is None:
+            return self.duration.max_pauses
+
+        return self.duration.max_pauses - self.state.num_pauses
+
     def duration_summary(self) -> str | None:
         """Get a human-readable summary of the state of our duration constraint, if we
         have one.
@@ -180,6 +202,11 @@ class BlockGroup:
         res: str = (
             f"{remaining - timedelta(microseconds=remaining.microseconds)} remaining"
         )
+
+        if (pauses_left := self.pauses_remaining()) is not None:
+            pauses_left = max(0, pauses_left)
+            pauses_plural = "s" if pauses_left != 1 else ""
+            res += f" with {pauses_left} pause{pauses_plural}"
 
         if self.state.prev_duration_reset is not None:
             # We can't say when the next reset will be if we've not reset before.
@@ -216,6 +243,10 @@ class BlockGroup:
             or self.duration.period.ready_to_reset(now, self.state.prev_duration_reset)
         ):
             return False
+
+        pauses_left: int | None = self.pauses_remaining()
+        if pauses_left is not None and pauses_left <= 0:
+            return True
 
         return self.duration_remaining().total_seconds() <= 0
 
@@ -258,6 +289,7 @@ class BlockGroup:
         if (
             self.state.prev_duration_reset is None
             or self.state.time_spent_paused is None
+            or self.state.num_pauses is None
             or self.duration.period.ready_to_reset(self.state.prev_duration_reset, now)
         ):
             self.state.reset_duration(now, self.duration)
@@ -302,6 +334,7 @@ class BlockGroup:
     def pause(self) -> None:
         """Pause this group's blocking."""
         self.is_paused = True
+        self.state.num_pauses += 1
         self.update_state()
 
     def unpause(self) -> None:

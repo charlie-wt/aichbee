@@ -38,7 +38,8 @@ twitch.tv
 # day/week/month by starting the line with a `<`. You can only have one duration-based
 # constraint on a group.
 #
-# Duration-based blocks can either be `per` day/week/month, or `each` day/week/month:
+# Duration-based constraints can either be `per` day/week/month, or for `each`
+# day/week/month:
 #
 # * *per* means they'll reset after that amount of time since the previous reset (eg.
 #   `per week` will reset every 24×7 hours; 1 month = 30 days).
@@ -46,7 +47,11 @@ twitch.tv
 #   month` will reset when the calendar month has changed, at midnight on the 1st).
 #
 # Duration-based blocks are activated and deactivated via the CLI.
-<1hr per week
+#
+# You can **optionally** specify the maximum number of times the group's blocking can be
+# paused in the duration's period with the `, _ pauses` suffix. If absent, you can pause
+# the group as many times as you like until the duration runs out.
+<1hr per week, 3 pauses
 
 zombo.com
 =

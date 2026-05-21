@@ -257,7 +257,7 @@ def main():
         loop.add_signal_handler(signal.SIGTERM, loop.stop)
 
     try:
-        # Run the event loop. hit ctrl-c to stop.
+        # Run the event loop. Hit ctrl-c to stop.
         loop.run_forever()
     finally:
         # Cleanup.

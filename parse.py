@@ -76,7 +76,7 @@ def parse_schedule_constraint(line: str, group: BlockGroup) -> None:
 
 
 DURATION_PAT = re.compile(
-    r"<(?P<length>\d+\.?\d*)hrs?\s+(?P<mode>per|each)\s+(?P<period>\w+)"
+    r"<(?P<length>\d+\.?\d*)hrs?\s+(?P<mode>per|each)\s+(?P<period>\w+)(?P<extra>,\s+(?P<pauses>\d+)\s+pauses?)?"
 )
 
 
@@ -104,7 +104,12 @@ def parse_duration_constraint(line: str, group: BlockGroup) -> None:
             f"'{line}'"
         )
 
+    max_pauses = 0
+    if m.group("pauses") is not None:
+        max_pauses = int(m.group("pauses"))
+
     group.duration = Duration(
-        DurationPeriod.from_str(f"{m.group('mode')}_{m.group('period')}"),
-        float(m.group("length")),
+        period=DurationPeriod.from_str(f"{m.group('mode')}_{m.group('period')}"),
+        length_hours=float(m.group("length")),
+        max_pauses=max_pauses,
     )

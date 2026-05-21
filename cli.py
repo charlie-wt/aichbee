@@ -2,6 +2,7 @@
 
 import argparse
 import atexit
+from datetime import datetime as dt
 import functools
 import logging
 import os
@@ -65,6 +66,19 @@ def request_data(*args: str) -> list[str]:
         return response[1:]
 
 
+def set_is_paused_from_service(group: BlockGroup) -> bool:
+    """
+    Set the ``is_paused`` state of ``group`` by a request to the running service.
+    Modifies the input ``group`` in-place.
+
+    :returns: Response: whether ``group`` is paused.
+    """
+    response = request_data("is_paused", group.canonical_name())
+    assert response[0] == group.canonical_name()
+    group.is_paused = response[1] == "true"
+    return group.is_paused
+
+
 @functools.cache
 def groups(
     bf_path: Path | None = None, fail_on_connection_refused: bool = True
@@ -84,9 +98,7 @@ def groups(
         if group.duration is None:
             continue
         try:
-            response = request_data("is_paused", group.canonical_name())
-            assert response[0] == group.canonical_name()
-            group.is_paused = response[1] == "true"
+            set_is_paused_from_service(group)
         except ConnectionRefusedError as e:
             if fail_on_connection_refused:
                 raise e
@@ -95,7 +107,7 @@ def groups(
     return res
 
 
-def maybe_coloured_group_name(
+def maybe_coloured_group_status(
     group: BlockGroup, should_colour: bool = True, prefix: str = "", suffix: str = ""
 ) -> str:
     """
@@ -118,7 +130,7 @@ def maybe_coloured_group_name(
             if should_colour:
                 c = (
                     colour.red
-                    if group.duration_remaining().total_seconds() <= 0
+                    if group.within_duration_constraints(dt.now())
                     else colour.cyan
                 )
                 remaining = c(remaining)
@@ -148,11 +160,11 @@ def ls(
         )
     for g in gs:
         if blocked_filter == True and g.is_blocking():
-            print(maybe_coloured_group_name(g, should_colour))
+            print(maybe_coloured_group_status(g, should_colour))
         elif blocked_filter == False and not g.is_blocking():
-            print(maybe_coloured_group_name(g, should_colour))
+            print(maybe_coloured_group_status(g, should_colour))
         elif blocked_filter is None:
-            print(maybe_coloured_group_name(g, should_colour))
+            print(maybe_coloured_group_status(g, should_colour))
 
 
 def show(
@@ -172,7 +184,7 @@ def show(
             f"{colour.yellow('WARNING')}: Couldn't connect to service (are you sure "
             "it's running?); will not be able to get runtime status of groups."
         )
-    print(maybe_coloured_group_name(to_show, should_colour, suffix=":\n"))
+    print(maybe_coloured_group_status(to_show, should_colour, suffix=":\n"))
     print(to_show)
 
 
@@ -208,10 +220,10 @@ def set_paused(group_name: str, paused: bool, bf_path: Path | None = None) -> No
     to_pause.is_paused = paused
 
     # Try and get more up-to-date state, after waiting a bit for messages to go through.
-    _ = request_data("is_paused", to_pause.canonical_name())
+    set_is_paused_from_service(to_pause)  # Note that a request to pause may be rejected
     to_pause.load_state()
 
-    logging.warning(maybe_coloured_group_name(to_pause, True))
+    logging.warning(maybe_coloured_group_status(to_pause, True))
 
 
 def pause(group_name: str, bf_path: Path | None = None) -> None:
